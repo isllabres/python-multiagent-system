@@ -1,0 +1,21 @@
+# data/ ya no la crea este sistema (ver CLAUDE.md — DS_IMMUTABLE_DIRS). Si tu proyecto usa la
+# convención por defecto data/raw + data/processed y versionas con DVC, no toques estas líneas
+# a mano: `dvc add data/raw` gestiona su propia entrada en este fichero automáticamente.
+# Sin DVC, estas líneas evitan que los datos crudos entren en git por accidente.
+data/raw/*
+data/processed/*
+!data/**/.gitkeep
+
+mlruns/
+reports/*.html
+*.pkl
+*.pt
+*.ckpt
+.env
+.env.*
+__pycache__/
+.ipynb_checkpoints/
+.ds-lite-convergence/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
