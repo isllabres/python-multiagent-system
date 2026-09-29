@@ -1,142 +1,140 @@
 # ds-lite
 
-Sistema multiagente para ciencia de datos, para Claude Code. Se instala como una capa sobre un
-proyecto nuevo o ya existente, añade los roles, comandos y comprobaciones que coordinan el trabajo. 
+A multi-agent system for data science, for Claude Code. It installs as a layer on top of a new or
+existing project, adding the roles, commands and checks that coordinate the work. 
 
-Seis roles, dos bucles de convergencia, diez comprobaciones, DVC por defecto para los datos.
+Six roles, two convergence loops, ten checks, DVC by default for the data.
 
-## Instalar
+## Install
 
 ```bash
-cp -r ds-lite/. ~/code/mi-proyecto/    # sobre tu estructura ya existente, sin pisarla
-cd ~/code/mi-proyecto
+cp -r ds-lite/. ~/code/my-project/    # onto your existing structure, without overwriting it
+cd ~/code/my-project
 
 uv add --dev pytest ruff mypy pre-commit nbstripout dvc
 pre-commit install
-dvc init && dvc remote add -d storage <tu-remoto>   # S3, GCS, un disco — el que uses
+dvc init && dvc remote add -d storage <your-remote>   # S3, GCS, a disk — whichever you use
 
-gh auth status                          # obligatorio: sin gh no hay flujo
-python3 setup-repo.py --new tu-org/mi-proyecto --private
-# o, si el repositorio ya existe:  python3 setup-repo.py --existing
+gh auth status                          # mandatory: no gh, no flow
+python3 setup-repo.py --new your-org/my-project --private
+# or, if the repository already exists:  python3 setup-repo.py --existing
 
 claude --agent ds-manager
-> /grill-me "quiero reducir la baja de clientes"
+> /grill-me "I want to reduce customer churn"
 ```
 
-## Commands, agents y skills — la distinción
+## Commands, agents and skills — the distinction
 
-Un **agent** (`.claude/agents/`) es una identidad: un prompt de sistema propio, un modelo, un conjunto de herramientas, invocado por delegación y con su propio contexto, sin memoria de la conversación principal más allá de lo que se le pase explícitamente.
+An **agent** (`.claude/agents/`) is an identity: its own system prompt, a model, a set of tools, invoked by delegation and with its own context, with no memory of the main conversation beyond what is explicitly passed to it.
 
-### Los seis agentes
+### The six agents
 
-| Rol | Modelo | Hace |
+| Role | Model | Does |
 |---|---|---|
-| `ds-manager` | opus | Interroga hasta converger, escribe el issue, metodología en revisión y arreglos |
-| `analyst` | sonnet | Puerta de datos: fugas, techo de rendimiento, estrategia de split |
-| `ds-developer` | sonnet | Implementa: rojo, luego verde, un criterio cada vez. Llama a `wiki-generator` al final |
-| `reviewer` | opus | Corrección de código, no metodología. Solo lectura |
-| `validator` | opus | Ejecuta test/eval/metric tras converger; dirige el arreglo; el único que mira cualquier recurso de una sola mirada |
-| `wiki-generator` | sonnet | Compila lo aprendido al wiki, una vez por issue |
+| `ds-manager` | opus | Interrogates until it converges, writes the issue, methodology in review and fixes |
+| `analyst` | sonnet | The data gate: leakage, performance ceiling, split strategy |
+| `ds-developer` | sonnet | Implements: red, then green, one criterion at a time. Calls `wiki-generator` at the end |
+| `reviewer` | opus | Code correctness, not methodology. Read-only |
+| `validator` | opus | Runs test/eval/metric once converged; leads the fix; the only one who looks at any one-look resource |
+| `wiki-generator` | sonnet | Compiles what was learned into the wiki, once per issue |
 
 
-### Los comandos, y los tres puntos donde te necesita
+### The commands, and the three points where it needs you
 
-Un **command** (`.claude/commands/`) un procedimiento con nombre que se inserta en la conversación **actual**, con `$ARGUMENTS` sustituido. Su cuerpo puede instruir "delega en `ds-developer`, luego en `reviewer`" — el comando orquesta, el agent ejecuta.
+A **command** (`.claude/commands/`) is a named procedure inserted into the **current** conversation, with `$ARGUMENTS` substituted. Its body can instruct "delegate to `ds-developer`, then to `reviewer`" — the command orchestrates, the agent executes.
 
-| Comando | Qué hace | ¿Te necesita? |
+| Command | What it does | Does it need you? |
 |---|---|---|
-| `/grill-me` | Interroga a fondo, una pregunta cada vez, con recomendación y exploración previa. Solo o dentro de `/create-issue` | Sí, es una conversación |
-| `/create-issue` | Discovery ligero, puerta de datos, invoca las skills, archiva el issue | **Sí** — apruebas antes de crear nada |
-| `/implement-issue` | Por criterio → integración → miradas únicas → wiki → **PR local**, de un tirón | **Sí** — confirmas la PR local antes de que toque GitHub |
-| `/review-issue` | Detecta si un issue `pending` sigue vigente | Confirma antes de refrescar |
-| `/update-issue` | Aplica un cambio pedido reejecutando `/create-issue` | Confirma etiquetas |
+| `/grill-me` | Interrogates in depth, one question at a time, with a recommendation and prior exploration. Standalone or inside `/create-issue` | Yes, it is a conversation |
+| `/create-issue` | Light discovery, data gate, invokes the skills, files the issue | **Yes** — you approve before anything is created |
+| `/implement-issue` | Per criterion → integration → single looks → wiki → **local PR**, in one go | **Yes** — you confirm the local PR before it touches GitHub |
+| `/review-issue` | Detects whether a `pending` issue is still valid | Confirm before refreshing |
+| `/update-issue` | Applies a requested change by re-running `/create-issue` | Confirm labels |
 
-Una **skill** (`.claude/skills/`) es un procedimiento con nombre que invoca **otro rol** como metodología de referencia cuando la necesita. También se pueden insertar en la conversación **actual**, con `$ARGUMENTS` sustituido
+A **skill** (`.claude/skills/`) is a named procedure that **another role** invokes as reference methodology when it needs it. They can also be inserted into the **current** conversation, with `$ARGUMENTS` substituted.
 
-## Qué encontrarás en el repositorio
+## What you will find in the repository
 
 ```
-CLAUDE.md                 El contrato. Único documento que hay que leer entero.
-setup-repo.py             Labels, branch protection en GitHub.
+CLAUDE.md                 The contract. The only document that has to be read in full.
+setup-repo.py             Labels, branch protection on GitHub.
 .claude/
-  agents/*.md             Los seis roles: quién hace el trabajo.
-  commands/*.md           Los cinco comandos humanos: qué escribes tú.
-  skills/*/SKILL.md       Herramientas de metodología que invoca ds-manager.
-  settings.json           El hook que hace cumplir "rojo antes que verde" del TDD.
-gates/                    Las diez comprobaciones — corren solas, sin necesitar un agente.
-templates/                ACCEPTANCE.yaml · wiki-log.md · wiki/ (jerarquía fija de 8 páginas)
-wiki/                     GitHub Wiki nativo: Home, _Sidebar, seis páginas fijas, raw/, log.md.
-specs/                    La sombra ejecutable de cada issue.
-experiments/              Auditorías de datos y resultados de evaluación.
-evals/                    Golden sets y el ledger de miradas únicas.
+  agents/*.md             The six roles: who does the work.
+  commands/*.md           The five human commands: what you type.
+  skills/*/SKILL.md       Methodology tools that ds-manager invokes.
+  settings.json           The hook that enforces TDD's "red before green".
+gates/                    The ten checks — they run on their own, needing no agent.
+templates/                ACCEPTANCE.yaml · wiki-log.md · wiki/ (fixed hierarchy of 8 pages)
+wiki/                     Native GitHub Wiki: Home, _Sidebar, six fixed pages, raw/, log.md.
+specs/                    The executable shadow of each issue.
+experiments/              Data audits and evaluation results.
+evals/                    Golden sets and the ledger of single looks.
 ```
 
-Carpetas como `data/`, `src/`, `tests/`, `notebooks/` **no están en esta lista a propósito** — son tu proyecto, no la capa multiagente.
+Folders such as `data/`, `src/`, `tests/`, `notebooks/` **are deliberately not in this list** — they are your project, not the multi-agent layer.
 
-Tres variables de entorno ajustan dónde miran los gates si tu convención difiere de `src/`, `tests/`, `data/raw/`: `DS_SRC_DIRS`, `DS_SRC_ROOT`, `DS_IMMUTABLE_DIRS`, documentadas en `CLAUDE.md`.
+Three environment variables adjust where the gates look if your convention differs from `src/`, `tests/`, `data/raw/`: `DS_SRC_DIRS`, `DS_SRC_ROOT`, `DS_IMMUTABLE_DIRS`, documented in `CLAUDE.md`.
 
 
-## Los diez gates
+## The ten gates
 
-Ejecutables Python con código de salida. `check.py` los corre todos; es lo mismo que ejecuta CI.
+Python executables with an exit code. `check.py` runs them all; it is what CI runs.
 
-| Gate | Detecta |
+| Gate | Detects |
 |---|---|
-| `py_audit` | Fugas por AST, semillas ausentes, `assert` sobre métricas en `tests/` |
-| `eda_report` | Informe dirigido: AUC univariante, grupos, tiempo, nulos, centinelas |
-| `traceability` | Criterios sin verificación, tests huérfanos |
-| `git_audit` | Crudos, secretos, binarios grandes, orden rojo→verde, `EVAL.md` sin commit o sin issue |
-| `issue_sync` | Deriva entre los issues de GitHub y `ACCEPTANCE.yaml` |
-| `holdout_ledger` | Cuenta las miradas a cualquier recurso de una sola mirada y detecta si cambió |
-| `convergence` | Rondas de arreglo por criterio, acumuladas entre los dos bucles |
-| `wiki_lint` | Falta alguna de las seis páginas fijas, `_Sidebar` incompleto, enlaces rotos, contradicciones sin resolver |
-| `tdd_guard` | Test nuevo que pasa a la primera — registrado como hook en `.claude/settings.json` |
-| `check` | Todo lo anterior + ruff + mypy (opcional) + pytest |
+| `py_audit` | Leakage by AST, missing seeds, `assert` on metrics in `tests/` |
+| `eda_report` | Targeted report: univariate AUC, groups, time, nulls, sentinels |
+| `traceability` | Criteria with no verification, orphan tests |
+| `git_audit` | Raw data, secrets, large binaries, red→green order, `EVAL.md` with no commit or no issue |
+| `issue_sync` | Drift between GitHub issues and `ACCEPTANCE.yaml` |
+| `holdout_ledger` | Counts the looks at any one-look resource and detects whether it changed |
+| `convergence` | Fix rounds per criterion, accumulated across the two loops |
+| `wiki_lint` | Any of the six fixed pages missing, incomplete `_Sidebar`, broken links, unresolved contradictions |
+| `tdd_guard` | A new test that passes first time — registered as a hook in `.claude/settings.json` |
+| `check` | Everything above + ruff + mypy (optional) + pytest |
 
 ## TDD Guard Hook
 
-`CLAUDE.md` y varios roles incluyen en su prompt que "un test nuevo se ve fallar antes de implementar". Esto lo aseguramos en `.claude/settings.json`, que la convierte en mecánica: un hook `PostToolUse` corre `gates/tdd_guard.py` tras cada `Write`/`Edit`, y si el fichero es un test nuevo (sin rastrear por git) que pasa a la primera, bloquea con salida 2 y el mensaje vuelve al agente. 
+`CLAUDE.md` and several roles state in their prompt that "a new test is watched failing before implementing". We enforce this in `.claude/settings.json`, which turns it into mechanics: a `PostToolUse` hook runs `gates/tdd_guard.py` after every `Write`/`Edit`, and if the file is a new test (untracked by git) that passes first time, it blocks with exit code 2 and the message goes back to the agent. 
 
-## Dos bucles, un presupuesto de rondas
+## Two loops, one round budget
 
 ```
-por criterio:  ds-developer ↔ {reviewer, ds-manager}
-integración:   validator ↔ ds-developer (+ ds-manager/reviewer si toca código)
+per criterion:  ds-developer ↔ {reviewer, ds-manager}
+integration:    validator ↔ ds-developer (+ ds-manager/reviewer if it touches code)
 ```
 
-`gates/convergence.py` cuenta las rondas de **ambos** bucles sobre el mismo contador por
-criterio. Tope por defecto: 3.
+`gates/convergence.py` counts the rounds of **both** loops on the same counter per criterion.
+Default cap: 3.
 
-**Ningún recurso de una sola mirada se toca en ninguno de los dos bucles.** Hay dos clases: la
-partición de `test` de una métrica de modelo, y el `dev`/`test` de un golden set de eval. Ambos se
-registran en el mismo `gates/holdout_ledger.py`, con presupuestos de mirada independientes entre
-sí — probado: un recurso puede ir por su segunda mirada mientras el otro sigue en la primera.
+**No one-look resource is touched in either of the two loops.** There are two classes: the `test`
+partition of a model metric, and the `dev`/`test` of an eval golden set. Both are recorded in the
+same `gates/holdout_ledger.py`, with independent look budgets — tested: one resource can be on its
+second look while the other is still on its first.
 
-## Datos: DVC por defecto
+## Data: DVC by default
 
 ```bash
 dvc init
-dvc remote add -d storage s3://mi-bucket/datos    # o gs://, o un disco montado, lo que uses
+dvc remote add -d storage s3://my-bucket/data    # or gs://, or a mounted disk, whatever you use
 dvc add data/raw
-git add data/raw.dvc .gitignore && git commit -m "data: versiona data/raw con DVC"
+git add data/raw.dvc .gitignore && git commit -m "data: version data/raw with DVC"
 ```
 
-El puntero (pequeño, con el hash) va a git; los datos van al remoto. `dvc install
---use-pre-commit-tool` genera los hooks correctos en `.pre-commit-config.yaml` con la versión
-fijada — el bloque que ya incluye este repositorio es de referencia inicial, regenéralo así en
-cuanto tengas DVC instalado para no arrastrar una versión desactualizada a mano.
+The pointer (small, carrying the hash) goes to git; the data go to the remote. `dvc install
+--use-pre-commit-tool` generates the right hooks in `.pre-commit-config.yaml` at the pinned
+version — the block this repository already includes is an initial reference, regenerate it that
+way as soon as you have DVC installed so you do not drag an outdated version along by hand.
 
-Esto es ortogonal al ledger de miradas: DVC versiona el dataset completo y de forma continua; el
-ledger cuenta miradas a un recurso concreto dentro de un issue concreto. Ambos hashean, por
-motivos distintos — no hace falta elegir entre uno u otro.
+This is orthogonal to the looks ledger: DVC versions the whole dataset, continuously; the ledger
+counts looks at one resource inside one issue. Both hash, for different reasons — there is no need
+to choose one over the other.
 
-## Calidad de código: Ruff cubre Black + Flake8 + isort
+## Code quality: Ruff covers Black + Flake8 + isort
 
-`ruff format` es un reemplazo directo de Black (mismo estilo, mismo output en la práctica).
-`ruff check` incluye el equivalente de las reglas de Flake8, y con el conjunto `I` activado, las
-de isort. No se añaden las tres herramientas por separado: además de ser trabajo redundante,
-Black y Ruff pueden discrepar en decisiones de formato de borde y acabar peleándose dentro del
-mismo hook de pre-commit. `mypy` se ejecuta y se reporta pero no bloquea `check.py` por
-defecto — es opcional; para hacerlo bloqueante, un solo booleano en `gates/check.py`.
-
-
+`ruff format` is a drop-in replacement for Black (same style, same output in practice).
+`ruff check` includes the equivalent of the Flake8 rules, and with the `I` set enabled, isort's.
+The three tools are not added separately: besides being redundant work, Black and Ruff can
+disagree on edge formatting decisions and end up fighting inside the same pre-commit hook. `mypy`
+runs and is reported but does not block `check.py` by default — it is optional; to make it
+blocking, a single boolean in `gates/check.py`.
