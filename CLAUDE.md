@@ -56,7 +56,8 @@ does not touch GitHub until you confirm the local PR.
 ## Six roles, two convergence loops
 
 ```
-manager          interrogates until it converges, writes the issue, judges conformance to the spec
+manager          the spec creator and the main agent: interrogates until it converges, writes
+                 the issue, runs the other roles and keeps the round tally. Does not review code
 analyst          any data analysis — explore, query, statistics, charts, reports
 tester           writes each criterion's red test or eval from the spec and proves it fails for
                  the right reason, then runs the suite and guards against tests bent to pass
@@ -76,8 +77,8 @@ separate role: it is a tool `manager` and `developer` use directly.
 grill-me:         explores the repo, asks one at a time with its own recommendation,
                   always runs inside create-issue after its light discovery
 create-issue:     manager writes → analyst (data facts, if a criterion depends on data) → issue
-implement-issue:  per criterion: tester writes red → developer makes it green
-                  → {tester, manager} review the diff, converges
+implement-issue:  per criterion: tester writes red → manager confirms it matches the criterion
+                  → developer makes it green → tester checks it, ↔ developer, converges
                   → tester runs the whole suite, then validator validates the Python;
                     ↔ developer (or tester, for tests) if something fails, converges
                   → developer calls wiki-generator, which records what changed
@@ -85,7 +86,7 @@ implement-issue:  per criterion: tester writes red → developer makes it green
 ```
 
 Two convergence loops, one round budget per criterion: `manager` keeps the tally of rounds of the
-per-criterion review and of the whole-change fix conversations (`tester`'s and `validator`'s) on
+per-criterion check and of the whole-change fix conversations (`tester`'s and `validator`'s) on
 the same counter — a fix that moves from one loop to the other does not reset the cap (3 rounds by
 default).
 
@@ -94,9 +95,9 @@ default).
 | Light discovery, then deep interrogation with exploration | `manager` (via `/create-issue` → `/grill-me`) | Creation |
 | Spec and test/eval classification | `manager` (via `/create-issue`) | Creation |
 | Data analysis; data facts for a criterion | `analyst` | Both (when needed) |
-| Red, per criterion | `tester` | Implementation |
-| Green, per criterion; review | `developer` ↔ {`tester`, `manager`} | Implementation, converges (cap 3 rounds) |
-| Whole suite, then Python validation; fixes if it fails | `tester`, then `validator` ↔ `developer` (`tester` for tests); a fix that touches code goes back through `tester` and `manager` | Implementation, converges (same cap, same counter) |
+| Red, per criterion; `manager` confirms it matches the criterion | `tester` | Implementation |
+| Green, per criterion; check | `developer` ↔ `tester` | Implementation, converges (cap 3 rounds) |
+| Whole suite, then Python validation; fixes if it fails | `tester`, then `validator` ↔ `developer` (`tester` for tests); a fix that touches code goes back through `tester` | Implementation, converges (same cap, same counter) |
 | Record the change in the wiki | `wiki-generator`, called by `developer` | Once, at the end |
 
 Two ways back. **DATA → SPEC**: if the facts about the data contradict a criterion,

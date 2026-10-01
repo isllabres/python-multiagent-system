@@ -29,7 +29,7 @@ An **agent** (`.claude/agents/`) is an identity: its own system prompt, a model,
 
 | Role | Model | Does |
 |---|---|---|
-| `manager` | opus | Interrogates until it converges, writes the issue, judges conformance to the spec in review and fixes |
+| `manager` | opus | The spec creator and the main agent: interrogates until it converges, writes the issue, runs the other roles and keeps the round tally. Does not review code |
 | `analyst` | sonnet | Any data analysis: explore, query, statistics, charts, reports |
 | `tester` | sonnet | Owns the tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, then runs the whole suite and guards against tests bent to pass. Never writes production code |
 | `developer` | sonnet | Python implementation expert: makes the red green, one criterion at a time, exactly as the spec says. Never touches a test. Calls `wiki-generator` at the end |
@@ -108,9 +108,9 @@ skipped or deleted.
 ## Two loops, one round budget
 
 ```
-per criterion:  tester (red) → developer (green) ↔ {tester, manager}
+per criterion:  tester (red) → manager (matches the criterion?) → developer (green) ↔ tester
 whole change:   tester (suite), then validator (Python) ↔ developer, or tester for tests
-                a fix that touches code goes back through tester and manager
+                a fix that touches code goes back through tester
 ```
 
 `manager` keeps one tally per criterion across **both** loops. Default cap: 3 rounds; the fourth
