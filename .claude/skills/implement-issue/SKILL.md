@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: Launches the full multi-agent cycle over an issue — per criterion, then the whole change, then wiki — and assembles a local PR. Does not touch GitHub until you confirm.
+description: Launches the full multi-agent cycle over an issue — per criterion, then the whole change, with the wiki updated after every commit — and assembles a local PR. Does not touch GitHub until you confirm.
 argument-hint: "<issue number>"
 ---
 
@@ -42,7 +42,8 @@ implement against a criterion that is already unreachable.
 
 ## Step 4 — Per criterion: red, green and converge
 
-For each criterion in `ACCEPTANCE.yaml`, in order:
+For each criterion in `ACCEPTANCE.yaml`, in order. After **every** commit below, fix commits
+included, `manager` calls `wiki-generator` with its hash (see Step 6).
 
 1. `tester` writes the test or eval from the spec, watches it fail for the right reason, and
    commits `red(#$ARGUMENTS-<AC>):`.
@@ -79,15 +80,24 @@ code, `tester` for tests, evals and fixtures. A fix that touches code goes back 
 is recorded on the same per-criterion counter as Step 4: accumulated, not reset.
 
 After a Python fix `tester` re-runs the suite and `validator` re-validates the files it touched.
-Repeat until everything passes or the cap is exhausted.
+Every fix commit gets its `wiki-generator` call like any other. Repeat until everything passes or
+the cap is exhausted.
 
-## Step 6 — Wiki (`wiki-generator`, called by `developer`)
+## Step 6 — Wiki check
 
-With `tester` and `validator` converged, **`developer` calls `wiki-generator`** — not `manager` —
-because they hold the full context of what was built. It updates the relevant pages of the project
-wiki, and `wiki/log.md` gets its entry.
+`wiki-generator` already ran after every commit: it appended one changelog line to `wiki/log.md`
+and edited a page only where behaviour or architecture changed. Verify nothing was skipped. Every
+commit of the branch except the `wiki(...)` ones must have its line:
 
-`README.md` is not touched here — it is the system's front door, not the project's.
+```bash
+for sha in $(git log --reverse --format=%h --invert-grep --grep='^wiki(' <default-branch>..HEAD); do
+  grep -q "$sha" wiki/log.md || echo "missing from the changelog: $sha"
+done
+```
+
+For each one missing, `manager` calls `wiki-generator` with that hash. Check also that
+`wiki/_Sidebar.md` still links to all six pages. `README.md` is not touched here — it is the
+system's front door, not the project's.
 
 ## Step 7 — Verify and assemble the local PR
 
@@ -99,8 +109,8 @@ uv run pytest -q
 ```
 
 All green, mypy reported. PR body assembled from `tester`'s and `validator`'s reports (results per
-criterion, the round history, Python findings and their disposition) and which wiki pages were
-touched:
+criterion, the round history, Python findings and their disposition), the changelog lines added
+and the wiki pages touched:
 
 ```markdown
 ## Summary
@@ -111,7 +121,8 @@ touched:
 - Per criterion: <rounds, who, what was fixed>
 - Whole change: <tester/validator ↔ developer conversation, if there was one>
 ## Wiki
-- Pages touched: <list>
+- Changelog: <n> lines, one per commit
+- Pages touched: <list, or none>
 Closes #$ARGUMENTS
 ```
 
@@ -132,11 +143,12 @@ Report the URL. **It does not merge, does not approve, does not close the issue.
 1. **The round cap is counted per criterion, across the per-criterion loop and the whole-change
    one.** A fix that moves from one loop to the other does not reset the counter.
 2. **Nothing touches GitHub before Step 8.**
-3. **The wiki is updated once, at the end, when everything has truly converged** — never in the
-   middle of a fix conversation, or work that may be undone would be recorded.
+3. **The wiki follows every commit**: one changelog line each, and a page edited only when
+   behaviour or architecture changed. A fix is just another commit; history is recorded, never
+   rewritten.
 4. **The evidence is honest**, uncomfortable findings included.
 5. **Red before green is in the history**: for every criterion, `tester`'s `red(...)` commit comes
    before `developer`'s `green(...)` one, and no `green(...)` commit touches a test.
-6. `tester` and `validator` diagnose, never implement. `developer` writes production code and, on
-   convergence, is the one who invokes `wiki-generator` — it does not decide what is blocking in
-   its own code. `manager` owns the spec and coordinates; it does not review code.
+6. `tester` and `validator` diagnose, never implement. `developer` writes production code and does
+   not decide what is blocking in its own code. `manager` owns the spec and coordinates, calling
+   `wiki-generator` after every commit; it does not review code.
