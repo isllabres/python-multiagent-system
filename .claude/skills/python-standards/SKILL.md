@@ -1,6 +1,6 @@
 ---
 name: python-standards
-description: The shared standard for what good Python looks like in this project — structure, typing, language semantics and traps, error handling, data-science code (pandas, numpy, scikit-learn), performance, security and tooling (uv, ruff, mypy, pytest). Carried by the developer who writes the code and the validator who judges it, so both work from one rubric.
+description: The shared standard for what good Python looks like in this project — structure, typing, language semantics and traps, error handling, data code (pandas, numpy), performance, security and tooling (uv, ruff, mypy, pytest). Carried by the developer who writes the code and the validator who judges it, so both work from one rubric.
 ---
 
 Pythonic means clear, explicit and consistent with the project, not clever. **The project's existing
@@ -18,7 +18,7 @@ Each rule says why it matters, so a finding can name the consequence and not jus
   or a Pydantic model, not a dict with implicit keys. `Protocol` for what a function needs from its
   arguments; `Enum`, `StrEnum` or `Literal` for closed sets. *Why: a typo in a dict key fails at
   runtime, a typo in an attribute fails at the checker.*
-- Configuration comes from `params.yaml` (or the project's config), never as literals in code.
+- Configuration comes from the project's config file, never as literals in code.
   Paths are `pathlib.Path`. Diagnostics use `logging` with lazy arguments, not `print`.
 - The public surface is deliberate: a leading underscore for internals, `__all__` where other
   modules import from this one. No dead code and no logic copied between modules.
@@ -64,18 +64,16 @@ Each rule says why it matters, so a finding can name the consequence and not jus
   `contextlib`, `match` where it beats an if-chain, f-strings.
 - The standard library and dependencies already in the project before a new dependency.
 
-## Data code: pandas, numpy, scikit-learn
+## Data code: pandas and numpy
 
 - Vectorise. No `iterrows` or row-wise `apply` where a column operation exists. No `pd.concat` (or
   the removed `DataFrame.append`) inside a loop: collect, then concatenate once.
 - No chained assignment: write with `.loc` and copy explicitly with `.copy()`. No `inplace=True`
   (it rarely saves memory and breaks chaining). No silent dtype coercion (`object` columns,
   a late `astype`).
-- Randomness comes from a seeded `np.random.default_rng(seed)` or an estimator's `random_state`,
-  the seed read from config. Never the global `np.random` or `random` state. *Why: an unseeded
-  component makes a reported metric unreproducible.*
-- Everything that learns parameters lives inside a `Pipeline`. Whether that causes leakage is
-  methodology and belongs to the manager; a `fit` before the split is still worth pointing out.
+- Randomness comes from a seeded `np.random.default_rng(seed)` (or the seed argument a library
+  offers), the seed read from config. Never the global `np.random` or `random` state. *Why: an
+  unseeded component makes a result unreproducible.*
 - Memory: appropriate dtypes, chunk or stream what does not fit, generators for one-pass
   transformations, categoricals and `float32` where they are enough.
 

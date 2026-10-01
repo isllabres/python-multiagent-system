@@ -49,7 +49,7 @@ from pathlib import Path
 DEFAULT_BASE = "https://wiki.python.org/python/"
 DEFAULT_CACHE = ".claude/cache/python-wiki"
 USER_AGENT = (
-    "ds-lab-python-wiki-graph/1.0 (code-review helper; single-threaded, cached, "
+    "dev-lab-python-wiki-graph/1.0 (code-review helper; single-threaded, cached, "
     "at most one request per second)"
 )
 NAV_PAGES = frozenset({"FrontPage", "TitleIndex", "RecentChanges"})
