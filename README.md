@@ -34,7 +34,7 @@ An **agent** (`.claude/agents/`) is an identity: its own system prompt, a model,
 | `tester` | sonnet | Owns the tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, then runs the whole suite and guards against tests bent to pass. Never writes production code |
 | `developer` | sonnet | Python implementation expert: makes the red green, one criterion at a time, exactly as the spec says. Never touches a test |
 | `validator` | opus | Judges the whole change as Python (semantics, structure, tooling; consults The Python Wiki on its first call) and gives feedback to `developer`. Read-only: never runs the suite |
-| `wiki-generator` | sonnet | Keeps the wiki in step with the code, briefly: one changelog line per commit, and a page edited only when behaviour or architecture changed. Called by `manager` after every commit |
+| `wiki-generator` | sonnet | Keeps the wiki, the code map every other role reads first, in step with the code, briefly: one changelog line per commit, and an entry (with code anchors) edited only when behaviour or architecture changed. Called by `manager` after every commit; also surveys an area the wiki does not cover yet |
 
 
 A **skill** (`.claude/skills/`) is a named procedure inserted into the **current** conversation, with `$ARGUMENTS` substituted. It is not an identity: it runs in your session, and its body can instruct "delegate to `tester`, then to `developer`" — the skill orchestrates, the agent executes. Skills come in two kinds: workflows you launch yourself with `/name`, and methodology that another role invokes when it needs it.
@@ -76,6 +76,7 @@ Carried by `analyst`, which is called for any data analysis. Each bundles a test
 |---|---|
 | `python-standards` | One rubric for good Python here: structure, typing, language traps, errors and resources, idioms, pandas/numpy code, performance, security, tooling. `developer` and `tester` write against it and `validator` checks against it |
 | `commit-messages` | Short, descriptive commits with the `red(#n-ACx):` / `green(#n-ACx):` prefix. `tester` makes the red ones, `developer` the green ones and `wiki-generator` the wiki ones |
+| `project-wiki` | How every role uses the project wiki as a map of the code: find the entry, follow its anchor straight to the symbol, read only that. Also the entry format and a checker that fails on anchors pointing at code that no longer exists, broken links and size limits |
 | `python-wiki-graph` | Builds a graph of The Python Wiki (an archive) on the validator's first call, so it can survey the sections, choose the pages that bear on the code it is validating, and read them in depth. One bounded, cached crawl; the wiki is asked for as little as possible |
 
 ## What you will find in the repository
@@ -84,10 +85,11 @@ Carried by `analyst`, which is called for any data analysis. Each bundles a test
 CLAUDE.md                 The contract. The only document that has to be read in full.
 .claude/
   agents/*.md             The six roles: who does the work.
-  skills/*/SKILL.md       The fourteen skills: five workflows you type (/create-issue, /grill-me, ...),
+  skills/*/SKILL.md       The fifteen skills: five workflows you type (/create-issue, /grill-me, ...),
                           two methodology skills that manager invokes, four analysis skills that
-                          analyst carries, two shared standards (Python, and commit messages),
-                          and the Python Wiki graph that validator runs first.
+                          analyst carries, three shared skills (Python, commit messages, and how to
+                          read the wiki as a code map), and the Python Wiki graph that
+                          validator runs first.
 specs/                    The executable shadow of each issue.
 analysis/                 The analyst's scripts, profiles and reports.
 evals/                    The cases an eval is judged over.
@@ -96,6 +98,19 @@ wiki/                     Native GitHub Wiki: Home, _Sidebar, six fixed pages, r
 ```
 
 Folders such as `src/`, `tests/` **are deliberately not in this list** — they are your project, not the multi-agent layer.
+
+## The wiki is the code map
+
+Every role reads the project wiki before it reads code. Its entries say what a part does and why,
+point at the code with anchors (`src/loader.py:load_rows`) and at the tests that verify it, and link
+to related entries. A role finds the entry, follows the anchor and reads that symbol, not the whole
+module. On an existing project the wiki starts empty, so before the work on an issue starts,
+`wiki-generator` surveys the area it touches. A checker fails on anchors that point at code that no
+longer exists, so the map cannot quietly rot:
+
+```bash
+python3 .claude/skills/project-wiki/scripts/check_wiki.py --base main
+```
 
 ## Red before green
 
