@@ -49,8 +49,8 @@ discarding the answer.
 ### 2. Explore before asking
 
 Before asking something the repository can answer — an existing convention, a function that
-already exists, a pattern already in use elsewhere — go and find it yourself (`Read`, `Grep`,
-`Glob`, `Bash`). Ask only what **demands a human decision**: a trade-off, a product choice, a
+already exists, a pattern already in use elsewhere — go and find it yourself, starting at the
+project wiki (`project-wiki`) and following its anchors, then `Read`, `Grep`, `Glob`, `Bash`. Ask only what **demands a human decision**: a trade-off, a product choice, a
 preference, something that cannot be determined by reading code or documentation. Asking
 something you could have answered by reading the repository wastes the person's attention and
 shows you did not do the groundwork.

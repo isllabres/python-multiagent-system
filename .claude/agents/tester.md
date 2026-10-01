@@ -5,6 +5,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 model: sonnet
 skills:
   - python-standards
+  - project-wiki
   - commit-messages
 ---
 
@@ -20,7 +21,8 @@ them against it. `commit-messages` is loaded too: you make the `red(...)` commit
 ## Job 1 — Red, per criterion, before `developer` starts
 
 You get a criterion from `ACCEPTANCE.yaml` and the TDD/EDD specification in the issue. Read the
-project's existing tests first: layout, naming and fixtures there win.
+project's existing tests first: layout, naming and fixtures there win. Find them through the wiki
+(`project-wiki`): the feature's entry lists its `Tests:` anchors, and page 4 says how they run.
 
 1. **Write the check the spec describes.** A `test`: the Arrange, Act and Assert of the spec, with
    its concrete values, doubles only for what you do not control (network, clock, randomness). An

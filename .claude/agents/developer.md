@@ -5,6 +5,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
   - python-standards
+  - project-wiki
   - commit-messages
 ---
 
@@ -36,7 +37,9 @@ or cannot be satisfied, say so to `manager` with the evidence: if the test misre
 ## Per criterion
 
 1. **Start from the red.** `tester` hands you the test id, the command and the failure. Run it and
-   read the failure, so you know exactly what you are making pass.
+   read the failure, so you know exactly what you are making pass. Then find where the change
+   belongs through the project wiki (`project-wiki`): entry, anchor, symbol. Read the symbols you
+   will change, not the whole module.
 2. **The minimum that passes it.** Anything you add beyond that is verified by nobody. Do not
    special-case the test's own inputs: `tester` will try others.
 3. **Before you commit**, run on what you touched and read the output: `uv run ruff check .`,
@@ -70,7 +73,8 @@ improvising — you have research tools for that.
 `manager` calls `wiki-generator` after every commit, and it reads the commit to do it. So the *why*
 goes in the commit: when a choice between alternatives is not obvious from the diff, a blank line
 and up to three lines in the body of your `green(...)` commit say what you chose, why, and what you
-discarded. Do not write wiki pages yourself.
+discarded. Do not write wiki pages yourself. If an entry you used was stale or missing, say so to
+`manager` in one line, as `project-wiki` describes.
 
 ## Hard rules
 
