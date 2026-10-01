@@ -73,7 +73,7 @@ or a URL. A miss suggests close matches.
 
 ## Be gentle with the wiki
 
-Its own banner says it is being retired because bots, crawlers and LLM companies overload it. So:
+Its own banner says it is being retired because automated crawlers overload it. So:
 one request at a time, at least one second apart (the delay holds across processes), a hard cap of
 80 requests per run, everything cached, and a page read is fetched once. Do not loop `read` over
 many pages, do not lower `--delay` for the real site, and do not run `build` unless the cache is

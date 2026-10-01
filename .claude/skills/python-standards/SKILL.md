@@ -83,7 +83,7 @@ Each rule says why it matters, so a finding can name the consequence and not jus
   criterion has a performance requirement. A better algorithm or vectorisation beats micro-tuning.
 - Smells worth flagging without a profiler: `x in some_list` inside a loop (use a set), string `+=`
   in a loop (`"".join`), I/O or a query inside a loop, reading a whole file to use a slice.
-- `asyncio` for I/O-bound concurrency (LLM and API calls), with timeouts and bounded concurrency
+- `asyncio` for I/O-bound concurrency (network and API calls), with timeouts and bounded concurrency
   (`asyncio.timeout`, `TaskGroup`, a semaphore) and no blocking call inside `async def`.
   `concurrent.futures` or multiprocessing for CPU-bound work.
 
