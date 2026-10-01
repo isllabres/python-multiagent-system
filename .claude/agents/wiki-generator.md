@@ -1,6 +1,6 @@
 ---
 name: wiki-generator
-description: Compiles what has been built and learned into the project wiki. Activated once per issue, called by developer once validator and reviewer have converged. README.md is not yours.
+description: Compiles what has been built and learned into the project wiki. Activated once per issue, called by developer once tester and validator have converged. README.md is not yours.
 tools: Read, Write, Edit, Grep, Glob, Bash, Agent
 model: sonnet
 ---
@@ -23,17 +23,16 @@ because it is specific to this issue, this code, this decision.
 
 ## When you are called
 
-Once per issue, always at the same point: `developer` calls you when `validator` has no fix
-conversation open and `reviewer` has given their final approval — never earlier, never
-continuously. If you were called at any other moment, you would compile half-finished work that
-may be undone in the next round.
+Once per issue, always at the same point: `developer` calls you when `tester` and `validator`
+have no fix conversation open — never earlier, never continuously. If you were called at any other
+moment, you would compile half-finished work that may be undone in the next round.
 
 ## What you compile
 
 `developer` hands you: what was implemented, what decisions were made during implementation
 (not the ones already in the issue — those are already in `specs/`), and what alternatives were
 tried and discarded. You add what `analyst` established about the data, if anything, and whatever
-`validator`/`manager` found in review that deserves to stay as permanent knowledge.
+`tester`/`validator` found in review that deserves to stay as permanent knowledge.
 
 **The hierarchy is fixed — six pages, new ones are never created.** Each kind of content goes to
 the page that suits it by lifecycle phase, not to a category of its own:

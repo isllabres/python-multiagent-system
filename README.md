@@ -29,15 +29,15 @@ An **agent** (`.claude/agents/`) is an identity: its own system prompt, a model,
 
 | Role | Model | Does |
 |---|---|---|
-| `manager` | opus | Interrogates until it converges, writes the issue, judges conformance to the spec in review and fixes |
+| `manager` | opus | The spec creator and the main agent: interrogates until it converges, writes the issue, runs the other roles and keeps the round tally. Does not review code |
 | `analyst` | sonnet | Any data analysis: explore, query, statistics, charts, reports |
-| `developer` | sonnet | Python implementation expert: red, then green, one criterion at a time, exactly as the spec says. Calls `wiki-generator` at the end |
-| `reviewer` | opus | Code correctness, not conformance to the spec. Read-only |
-| `validator` | opus | Validates the whole change as Python (semantics, structure, tooling; consults The Python Wiki on its first call), then runs the suite once converged; leads the fix |
+| `tester` | sonnet | Owns the tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, then runs the whole suite and guards against tests bent to pass. Never writes production code |
+| `developer` | sonnet | Python implementation expert: makes the red green, one criterion at a time, exactly as the spec says. Never touches a test. Calls `wiki-generator` at the end |
+| `validator` | opus | Judges the whole change as Python (semantics, structure, tooling; consults The Python Wiki on its first call) and gives feedback to `developer`. Read-only: never runs the suite |
 | `wiki-generator` | sonnet | Compiles what was learned into the wiki, once per issue |
 
 
-A **skill** (`.claude/skills/`) is a named procedure inserted into the **current** conversation, with `$ARGUMENTS` substituted. It is not an identity: it runs in your session, and its body can instruct "delegate to `developer`, then to `reviewer`" — the skill orchestrates, the agent executes. Skills come in two kinds: workflows you launch yourself with `/name`, and methodology that another role invokes when it needs it.
+A **skill** (`.claude/skills/`) is a named procedure inserted into the **current** conversation, with `$ARGUMENTS` substituted. It is not an identity: it runs in your session, and its body can instruct "delegate to `tester`, then to `developer`" — the skill orchestrates, the agent executes. Skills come in two kinds: workflows you launch yourself with `/name`, and methodology that another role invokes when it needs it.
 
 ### The workflow skills, and the three points where it needs you
 
@@ -45,7 +45,7 @@ A **skill** (`.claude/skills/`) is a named procedure inserted into the **current
 |---|---|---|
 | `/grill-me` | Interrogates in depth, one question at a time, with a recommendation and prior exploration. Standalone or inside `/create-issue` | Yes, it is a conversation |
 | `/create-issue` | Light discovery, data facts, invokes the skills, files the issue | **Yes** — you approve before anything is created |
-| `/implement-issue` | Per criterion → integration → wiki → **local PR**, in one go | **Yes** — you confirm the local PR before it touches GitHub |
+| `/implement-issue` | Per criterion (red, green) → whole change (suite, Python review) → wiki → **local PR**, in one go | **Yes** — you confirm the local PR before it touches GitHub |
 | `/review-issue` | Detects whether a `pending` issue is still valid | Confirm before refreshing |
 | `/update-issue` | Applies a requested change by re-running `/create-issue` | Confirm labels |
 
@@ -74,7 +74,8 @@ Carried by `analyst`, which is called for any data analysis. Each bundles a test
 
 | Skill | Does |
 |---|---|
-| `python-standards` | One rubric for good Python here: structure, typing, language traps, errors and resources, idioms, pandas/numpy code, performance, security, tooling. `developer` writes against it and `validator` checks against it |
+| `python-standards` | One rubric for good Python here: structure, typing, language traps, errors and resources, idioms, pandas/numpy code, performance, security, tooling. `developer` and `tester` write against it and `validator` checks against it |
+| `commit-messages` | Short, descriptive commits with the `red(#n-ACx):` / `green(#n-ACx):` prefix. `tester` makes the red ones and `developer` the green ones |
 | `python-wiki-graph` | Builds a graph of The Python Wiki (an archive) on the validator's first call, so it can survey the sections, choose the pages that bear on the code it is validating, and read them in depth. One bounded, cached crawl; the wiki is asked for as little as possible |
 
 ## What you will find in the repository
@@ -83,11 +84,10 @@ Carried by `analyst`, which is called for any data analysis. Each bundles a test
 CLAUDE.md                 The contract. The only document that has to be read in full.
 .claude/
   agents/*.md             The six roles: who does the work.
-  skills/*/SKILL.md       The thirteen skills: five workflows you type (/create-issue, /grill-me, ...),
+  skills/*/SKILL.md       The fourteen skills: five workflows you type (/create-issue, /grill-me, ...),
                           two methodology skills that manager invokes, four analysis skills that
-                          analyst carries, the Python standard that developer and validator share,
+                          analyst carries, two shared standards (Python, and commit messages),
                           and the Python Wiki graph that validator runs first.
-  settings.json           Hooks. The TDD guard points at gates/tdd_guard.py, which does not exist yet.
 specs/                    The executable shadow of each issue.
 analysis/                 The analyst's scripts, profiles and reports.
 evals/                    The cases an eval is judged over.
@@ -96,15 +96,21 @@ wiki/                     Native GitHub Wiki: Home, _Sidebar, six fixed pages, r
 
 Folders such as `src/`, `tests/` **are deliberately not in this list** — they are your project, not the multi-agent layer.
 
-## TDD Guard Hook
+## Red before green
 
-`CLAUDE.md` and several roles state in their prompt that "a new test is watched failing before implementing". The intended mechanism is in `.claude/settings.json`: a `PostToolUse` hook that runs `gates/tdd_guard.py` after every `Write`/`Edit`, and if the file is a new test (untracked by git) that passes first time, blocks with exit code 2 and sends the message back to the agent. The script is not in the repository yet, so today the hook only reports that it cannot run.
+There is no hook for it: it is a role. `tester` writes each criterion's test or eval and runs it
+before `developer` starts, and only commits it, as `red(#n-ACx):`, if it fails for the right reason
+(the behaviour is missing, not a typo in the test). `developer` then makes it pass and commits
+`green(#n-ACx):`, without ever editing a test. Afterwards `tester` checks the history: no `green`
+commit may touch a test, an eval runner or a case file, and no assertion may have been loosened,
+skipped or deleted.
 
 ## Two loops, one round budget
 
 ```
-per criterion:  developer ↔ {reviewer, manager}
-integration:    validator ↔ developer (+ manager/reviewer if it touches code)
+per criterion:  tester (red) → manager (matches the criterion?) → developer (green) ↔ tester
+whole change:   tester (suite), then validator (Python) ↔ developer, or tester for tests
+                a fix that touches code goes back through tester
 ```
 
 `manager` keeps one tally per criterion across **both** loops. Default cap: 3 rounds; the fourth

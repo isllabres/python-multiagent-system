@@ -1,11 +1,12 @@
 ---
 name: implement-issue
-description: Launches the full multi-agent cycle over an issue — per criterion, then integration, then wiki — and assembles a local PR. Does not touch GitHub until you confirm.
+description: Launches the full multi-agent cycle over an issue — per criterion, then the whole change, then wiki — and assembles a local PR. Does not touch GitHub until you confirm.
 argument-hint: "<issue number>"
 ---
 
-`manager` coordinates this whole sequence. Nothing is pushed or opened on GitHub until Step 8, and
-only with your explicit confirmation.
+`manager`, the main agent, coordinates this whole sequence: it delegates to the other roles, hands
+findings to whoever owns the code, and keeps the round tally. It does not review the code. Nothing
+is pushed or opened on GitHub until Step 8, and only with your explicit confirmation.
 
 Detect the repository with `gh repo view`. If `gh auth status` fails, stop.
 
@@ -39,48 +40,52 @@ establishes them before anyone touches code. If they contradict a criterion — 
 since the issue was created — **stop and comment on the issue** with the evidence; do not
 implement against a criterion that is already unreachable.
 
-## Step 4 — Per criterion: implement and converge
+## Step 4 — Per criterion: red, green and converge
 
 For each criterion in `ACCEPTANCE.yaml`, in order:
 
-1. `developer` writes red (watches it fail), commit `red(#$ARGUMENTS-<AC>):`, writes the
-   minimum green, commit `green(#$ARGUMENTS-<AC>):`.
-2. `reviewer` and `manager` review the same diff, each through their own lens — code for the
-   first, conformance to the spec for the second.
-3. If either of them has a blocking finding, `manager` records the round: criterion, who raised
-   it, the finding. Rounds are counted per criterion, shared with the integration loop in Step 5.
-   If this would be the 4th round, **stop**, comment the blockage on the issue with the full
-   history, and wait for instructions.
+1. `tester` writes the test or eval from the spec, watches it fail for the right reason, and
+   commits `red(#$ARGUMENTS-<AC>):`.
+2. `manager` checks that the red test is the right check for the criterion — its statement, its
+   verification, its bar. If not, it goes back to `tester` and the round is recorded.
+3. `developer` writes the minimum that turns it green and commits `green(#$ARGUMENTS-<AC>):`. It
+   never touches the test.
+4. `tester` checks the green: runs it and everything before it, checks that the tests are intact,
+   that nothing hardcodes the test's inputs, and that the diff does no more than the criterion asks.
+   `manager` does not review the code.
+5. If `tester` has a blocking finding, `manager` records the round — criterion, the finding — and
+   hands it to `developer`, who fixes it (a test it thinks is wrong goes to `manager`, who decides
+   between `tester` fixing the test and the spec changing) and goes back to step 4. Rounds are
+   counted per criterion, shared with the whole-change loop in Step 5. If this would be the 4th
+   round, **stop**, comment the blockage on the issue with the full history, and wait for
+   instructions.
+6. No blocking findings → next criterion.
 
-   Within the cap: `developer` fixes (never touching the test to make the finding go away), and
-   goes back to step 2.
-4. No blocking findings → next criterion.
+## Step 5 — Whole change: `tester`, then `validator`
 
-## Step 5 — Integration (`validator`)
-
-With every criterion converged individually, `validator` first validates the whole change as
-Python — semantics and structure against `python-standards`, plus `ruff` and `mypy` — and then
-runs the full suite — `pytest` and the evals — because a criterion that passed in isolation can
-break when combined with another, and a diff that passes every test can still be badly structured.
-
-A blocking Python finding opens the same fix conversation as a failing test, on the same round
-counter.
+With every criterion converged individually, `tester` runs the whole suite — `pytest` and the evals
+— and the test-integrity check over the branch, because a criterion that passed in isolation can
+break when combined with another. Only with the suite green does `validator` validate the whole
+change as Python — semantics and structure against `python-standards`, plus `ruff` and `mypy` —
+because a diff that passes every test can still be badly structured. It runs second so that it
+reviews code that will not move because of a failing test.
 
 **If anything fails:**
 
-`validator` opens a conversation with `developer` describing the symptom with literal evidence — it
-does not propose the fix, it describes it. If the fix touches production code, the round goes back
-through `manager` and `reviewer` before `validator` re-runs — it is never skipped for looking
-trivial. Every round is recorded on the same per-criterion counter as Step 4: accumulated, not
-reset.
+`tester` or `validator` reports it to `manager` with literal evidence and without proposing the
+fix. `manager` records the round and hands it to the owner of the code: `developer` for production
+code, `tester` for tests, evals and fixtures. A fix that touches code goes back through `tester`
+(suite and integrity) before it is closed — it is never skipped for looking trivial. Every round
+is recorded on the same per-criterion counter as Step 4: accumulated, not reset.
 
-`validator` re-runs the suite. Repeat until everything passes or the cap is exhausted.
+After a Python fix `tester` re-runs the suite and `validator` re-validates the files it touched.
+Repeat until everything passes or the cap is exhausted.
 
 ## Step 6 — Wiki (`wiki-generator`, called by `developer`)
 
-With `validator` converged and `reviewer` giving their final approval, **`developer` calls
-`wiki-generator`** — not `manager` — because they hold the full context of what was built. It
-updates the relevant pages of the project wiki, and `wiki/log.md` gets its entry.
+With `tester` and `validator` converged, **`developer` calls `wiki-generator`** — not `manager` —
+because they hold the full context of what was built. It updates the relevant pages of the project
+wiki, and `wiki/log.md` gets its entry.
 
 `README.md` is not touched here — it is the system's front door, not the project's.
 
@@ -93,8 +98,9 @@ uv run mypy <touched paths>        # advisory: report it, do not silence it
 uv run pytest -q
 ```
 
-All green, mypy reported. PR body assembled from `validator`'s report (results per criterion, the
-round history, Python findings and their disposition) and which wiki pages were touched:
+All green, mypy reported. PR body assembled from `tester`'s and `validator`'s reports (results per
+criterion, the round history, Python findings and their disposition) and which wiki pages were
+touched:
 
 ```markdown
 ## Summary
@@ -103,7 +109,7 @@ round history, Python findings and their disposition) and which wiki pages were 
 - Tests / Evals: <result for each criterion>
 ## Review
 - Per criterion: <rounds, who, what was fixed>
-- Integration: <validator↔developer conversation, if there was one>
+- Whole change: <tester/validator ↔ developer conversation, if there was one>
 ## Wiki
 - Pages touched: <list>
 Closes #$ARGUMENTS
@@ -123,11 +129,14 @@ Report the URL. **It does not merge, does not approve, does not close the issue.
 
 ## Principles
 
-1. **The round cap is counted per criterion, across the per-criterion loop and the integration
+1. **The round cap is counted per criterion, across the per-criterion loop and the whole-change
    one.** A fix that moves from one loop to the other does not reset the counter.
 2. **Nothing touches GitHub before Step 8.**
 3. **The wiki is updated once, at the end, when everything has truly converged** — never in the
    middle of a fix conversation, or work that may be undone would be recorded.
 4. **The evidence is honest**, uncomfortable findings included.
-5. `validator` diagnoses, never implements. `developer` implements and, on convergence, is the one
-   who invokes `wiki-generator` — it does not decide what is blocking in its own code.
+5. **Red before green is in the history**: for every criterion, `tester`'s `red(...)` commit comes
+   before `developer`'s `green(...)` one, and no `green(...)` commit touches a test.
+6. `tester` and `validator` diagnose, never implement. `developer` writes production code and, on
+   convergence, is the one who invokes `wiki-generator` — it does not decide what is blocking in
+   its own code. `manager` owns the spec and coordinates; it does not review code.
