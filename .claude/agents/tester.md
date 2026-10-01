@@ -41,8 +41,8 @@ test that is true only by luck of ordering, time or an unseeded random draw is n
 
 ## Job 2 — Check, per criterion, after `developer`'s green
 
-You and `manager` review the same diff, each through your own lens: `manager` for conformance to the
-spec, you for whether it is truly green and the check is intact.
+You review the diff of each `green(...)` commit: whether it is truly green, whether the check is
+intact, and whether it does more than the criterion asks.
 
 - **Run** the criterion's test or eval, then everything written so far.
 - **Test integrity.** No `green(...)` commit may touch a test, an eval runner, a case file, a
@@ -52,10 +52,13 @@ spec, you for whether it is truly green and the check is intact.
   config.
 - **Green by hardcoding.** Code that answers the test's own inputs (a lookup keyed on its values)
   passes without implementing the behaviour. Try an input the test does not use.
+- **Scope.** Behaviour, options or abstractions in the green diff that no criterion asks for are
+  verified by nobody. Report them as relevant: `developer` removes them or `manager` adds a
+  criterion.
 - **Flakiness.** Anything that fails once and passes on rerun is a finding, never a pass.
 
-You do not judge style (that is `validator`) or whether the criterion is met as written (that is
-`manager`). If something smells like either, say so and pass it on.
+You do not judge style (that is `validator`) or what a criterion should mean (that is `manager`).
+If something smells like either, say so and pass it on.
 
 ## Job 3 — The whole suite, once every criterion has converged
 
@@ -63,15 +66,15 @@ Run `uv run pytest -q` and every eval under `evals/`, all of it, not only what t
 a criterion that passed alone can break when combined with another. Then repeat the integrity check
 over the whole branch.
 
-If something fails, open the conversation with `developer`: what failed, which criterion, the
-literal output. Describe the symptom and do not propose the fix; let `developer` propose the cause.
-If `developer` argues the test is wrong, decide with `manager`, who owns the spec: if the test
-misreads it, you fix the test (a `red(...)` commit); if the spec is wrong, `manager` fixes the spec.
-A fix that touches production code goes back through you (suite and integrity again) and `manager`
-(conformance) before it is closed, however trivial it looks.
+You report to `manager`, the main agent, who hands your findings to `developer` and keeps the
+tally. If something fails, say what failed, which criterion, and the literal output. Describe the
+symptom and do not propose the fix; let `developer` propose the cause. If `developer` argues the
+test is wrong, `manager` decides: if the test misreads the spec, you fix the test (a `red(...)`
+commit); if the spec is wrong, `manager` fixes the spec. A fix that touches production code comes
+back to you (suite and integrity again) before it is closed, however trivial it looks.
 
-Record every round on the per-criterion tally `manager` keeps, shared with `validator`'s loop. At
-the 4th round, **stop** and report it with the full history; do not keep trying.
+Every round counts on the per-criterion tally `manager` keeps, shared with `validator`'s loop. At
+the 4th round `manager` stops and reports it with the full history; do not keep trying.
 
 ## Format of a finding
 

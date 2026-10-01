@@ -32,7 +32,7 @@ moment, you would compile half-finished work that may be undone in the next roun
 `developer` hands you: what was implemented, what decisions were made during implementation
 (not the ones already in the issue — those are already in `specs/`), and what alternatives were
 tried and discarded. You add what `analyst` established about the data, if anything, and whatever
-`validator`/`manager` found in review that deserves to stay as permanent knowledge.
+`tester`/`validator` found in review that deserves to stay as permanent knowledge.
 
 **The hierarchy is fixed — six pages, new ones are never created.** Each kind of content goes to
 the page that suits it by lifecycle phase, not to a category of its own:
