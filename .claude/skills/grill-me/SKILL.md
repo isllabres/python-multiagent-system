@@ -27,7 +27,7 @@ case, interrogate exactly that brief, and do not ask the person to repeat it.
 - **Explicit**: the person runs `/grill-me` directly, or says something like "grill me on this",
   "stress-test this plan", "find the seams in it".
 - **Orchestrated**: `/create-issue` invokes you right after its Step 1 (issue type, one-sentence
-  summary, context answers by type, test/eval/metric classification, readiness), before
+  summary, context answers by type, test/eval classification, readiness), before
   assessing scope or generating any spec. In this mode: interrogate the context Step 1 already
   gathered, and **return the resolved decisions** so `/create-issue` can continue. Do not file
   anything, and do not re-ask what Step 1 already asked and got a real answer to.
@@ -41,7 +41,7 @@ scope boundaries, behaviour in edge cases, data/state handling, error handling,
 performance/security constraints, integration points, and what is explicitly left out. A
 "decision" is anything where a different answer would change what gets built.
 
-Order matters: some decisions condition others (e.g. "is this a `metric` or an `eval`
+Order matters: some decisions condition others (e.g. "is this a `test` or an `eval`
 criterion?" changes which verification questions make sense afterwards). Ask what conditions
 first, so an early answer can prune entire branches of later questions instead of asking them and
 discarding the answer.
@@ -66,11 +66,10 @@ said X, does that mean Y too...?").
 For every question, give your own recommendation and the reason in one line, so the person can
 simply say "yes" instead of composing an answer from scratch:
 
-> **Q: Should a query with no matching domain fall back to a direct LLM answer, or return "no
-> match" and stop?**
-> My recommendation: fall back to a direct answer — a hard cut-off feels broken to the end user,
-> and the routing layer can log the miss anyway for later analysis. Agreed, or would you prefer
-> it another way?
+> **Q: Should a lookup with no match return `None`, or raise `LookupError`?**
+> My recommendation: raise `LookupError` — a silent `None` moves the failure far from its cause,
+> and a caller that wants a default can catch it explicitly. Agreed, or would you prefer it
+> another way?
 
 Make the recommendation genuinely opinionated — a real stance, not "it depends". If you truly
 have no basis to recommend, say so explicitly instead of faking one.
@@ -128,8 +127,8 @@ question where it does not fit:
 - **Non-functional constraints** — performance, latency, security, compliance, cost.
 - **Integration points** — what this touches or what touches it; contracts with other systems.
 - **Experience of whoever uses it** — what they see on success, on failure, on partial success.
-- **Verification** — how "done" will be checked (tests, evals, metrics, manual QA). This feeds
-  directly into the `define-tests`/`define-evals`/`define-metrics` skills when the destination is
+- **Verification** — how "done" will be checked (tests, evals, manual QA). This feeds
+  directly into the `define-tests`/`define-evals` skills when the destination is
   `/create-issue`.
 - **Deployment/migration** — if this changes existing behaviour, how the transition happens;
   whether there is a flag, a deprecation window, a backfill.
@@ -157,7 +156,7 @@ transcript:
 context instead of presenting it as the final deliverable. `/create-issue` folds it into its Step
 2 (Scope) and into the final body of the issue — "Resolved" feeds the acceptance criteria,
 "Explicitly out of scope" feeds the issue's section of the same name, "Still open" feeds the
-Technical notes so `ds-developer` knows where there is legitimate room.
+Technical notes so `developer` knows where there is legitimate room.
 
 **In standalone mode**: present it to the person as the deliverable. If the resolved plan looks
 like new work worth tracking, ask whether they want to run `/create-issue` next — do not invoke

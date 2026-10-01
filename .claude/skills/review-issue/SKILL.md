@@ -18,13 +18,10 @@ Look for conflicts, with concrete evidence (commit, file, symbol) for each:
 
 - **Reference drift** — files or functions the issue names no longer exist, or were moved.
 - **Already solved** — the behaviour described is already on `main`.
-- **Data drift** (specific to this system) — re-run the `data-profiling` and `data-audit`
-  scripts (`experiments/<id>/scripts/` has the exact commands) and compare their JSON against the
-  original `DATA_AUDIT.md`. If the ceiling has moved below the issue's target, it is
+- **Data drift** — if the issue depends on facts about data, re-run the `data-profiling` script
+  (`analysis/<id>/scripts/` has the exact commands) and compare its JSON against the profile the
+  issue was written from. If a figure the criteria rely on has moved, a criterion may be
   unimplementable as written.
-- **Test partition spent** — `python3 gates/holdout_ledger.py status <path>` shows accumulated
-  looks, or a changed hash, since it was filed. Any number reported against that test partition
-  carries that warning.
 
 ## Verdict
 
@@ -36,8 +33,8 @@ anything:
 > "Issue #<n> has <k> conflict(s): <one per line, with evidence>. I would refresh it by
 > re-running `/create-issue` against current reality. Proceed?"
 
-With my confirmation: re-run Step 2.5 (the data gate) and Step 3 (`define-tests`, `define-evals`,
-`define-metrics`) of `/create-issue` against the current state, keeping whatever did not change —
+With my confirmation: re-run Step 2.5 (data facts) and Step 3 (`define-tests`, `define-evals`) of
+`/create-issue` against the current state, keeping whatever did not change —
 do not re-ask what I already answered and the conflict did not touch. Recompose the body,
 **confirm the `pending` label with me** (do I remove it because it is ready now, or leave it?),
 and edit:

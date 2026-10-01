@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""Profile a tabular dataset: structure, quality problems, and (optionally) target, time and
-group structure.
-
-Only target-independent checks and simple target/time/group descriptions live here. The
-target-aware ones (leakage, split strategy, performance ceiling) are in the data-audit skill.
+"""Profile a tabular dataset: structure, quality problems, and (optionally) its time and
+entity structure.
 
 Usage:
-  profile_data.py --data PATH [--target COL] [--time COL] [--group COL]
+  profile_data.py --data PATH [--time COL] [--group COL]
                   [--nrows N] [--sample N] [--seed 0] [--max-cols 60] [--out profile.json]
 
   --nrows N   read only the first N rows (cheap on huge files, but may be biased)
@@ -146,7 +143,7 @@ def column_note(name, d):
 # --------------------------------------------------------------------------- analysis
 
 
-def profile(df, target, time_col, group_col):
+def profile(df, time_col, group_col):
     n = len(df)
     findings = []
     cols = {c: describe_column(df[c]) for c in df.columns}
@@ -154,8 +151,8 @@ def profile(df, target, time_col, group_col):
     dups = int(df.duplicated().sum())
     if dups:
         findings.append(
-            f"{dups} exactly duplicated rows ({100 * dups / n:.1f}%). If they cross a "
-            f"train/test split they leak."
+            f"{dups} exactly duplicated rows ({100 * dups / n:.1f}%). If rows should be "
+            f"unique, counts and totals are inflated."
         )
 
     high_null = [c for c, d in cols.items() if d["null_pct"] > 50]
@@ -177,7 +174,7 @@ def profile(df, target, time_col, group_col):
         s = df[c]
         if d["n_unique"] <= 2:
             continue  # flags and constants: 0/1 is a value there, not a sentinel
-        if d["kind"] == "numeric" and c != target:
+        if d["kind"] == "numeric":
             share = s.value_counts(normalize=True)
             for v in NUM_SENTINELS:
                 if v in share.index and share[v] > 0.15:
@@ -204,8 +201,7 @@ def profile(df, target, time_col, group_col):
     ids = [
         c
         for c, d in cols.items()
-        if c != target
-        and d["n_unique"] > 0.9 * n
+        if d["n_unique"] > 0.9 * n
         and n > 20
         and (
             d["kind"] in ("text", "categorical") or pd.api.types.is_integer_dtype(df[c])
@@ -213,8 +209,8 @@ def profile(df, target, time_col, group_col):
     ]
     if ids:
         findings.append(
-            f"Identifier-like columns (almost unique per row): {ids[:8]}. Exclude from "
-            f"features; row order or id order can correlate with the target."
+            f"Identifier-like columns (almost unique per row): {ids[:8]}. Keys, not "
+            f"measures: leave them out of statistics."
         )
 
     numeric_text = []
@@ -252,37 +248,6 @@ def profile(df, target, time_col, group_col):
         "id_like": ids,
     }
 
-    if target:
-        y = df[target]
-        t = {
-            "column": target,
-            "null_pct": round(100 * float(y.isna().mean()), 2),
-            "n_unique": int(y.nunique(dropna=True)),
-        }
-        if t["null_pct"] > 0:
-            findings.append(f"Target has {t['null_pct']}% nulls: rows without a label.")
-        if t["n_unique"] <= 1:
-            findings.append("Target is constant.")
-        elif t["n_unique"] <= 20:
-            share = y.value_counts(normalize=True, dropna=True)
-            t["class_share_pct"] = {
-                str(k): round(100 * float(v), 2) for k, v in share.items()
-            }
-            if t["n_unique"] == 2 and share.min() < 0.05:
-                findings.append(
-                    f"Target heavily imbalanced (minority {100 * share.min():.1f}%). "
-                    f"Use AUC-PR, stratify, and report the confusion matrix at the "
-                    f"operating threshold."
-                )
-        elif pd.api.types.is_numeric_dtype(y):
-            t["skew"] = py(y.skew())
-            if abs(t["skew"] or 0) > 2:
-                findings.append(
-                    f"Target is skewed (skew {t['skew']}): consider a transformed "
-                    f"target or a robust error metric."
-                )
-        out["target"] = t
-
     if group_col:
         g = df[group_col]
         counts = g.value_counts()
@@ -297,8 +262,9 @@ def profile(df, target, time_col, group_col):
         }
         if rpg > 1.2:
             findings.append(
-                f"{g.nunique()} groups for {n} rows ({rpg:.1f} per group). A random "
-                f"split is WRONG: use GroupKFold on '{group_col}'."
+                f"{g.nunique()} groups for {n} rows ({rpg:.1f} per group). Rows are not "
+                f"independent: compare at the level of '{group_col}', or resample by it, "
+                f"before using row-level tests."
             )
 
     if time_col:
@@ -324,10 +290,6 @@ def profile(df, target, time_col, group_col):
                     f"Time coverage has {len(missing)} empty month(s) inside the range "
                     f"(first: {missing[:3]}): a change in the source system?"
                 )
-        findings.append(
-            f"There is a time column ('{time_col}'). Unless proven otherwise the split "
-            f"must be temporal, not random."
-        )
         out["time"] = tt
 
     out["findings"] = findings
@@ -370,7 +332,6 @@ def main():
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     ap.add_argument("--data", required=True)
-    ap.add_argument("--target")
     ap.add_argument("--time")
     ap.add_argument("--group")
     ap.add_argument("--nrows", type=int)
@@ -382,7 +343,7 @@ def main():
 
     df = load_table(a.data, a.nrows)
     total = len(df)
-    for c in (a.target, a.time, a.group):
+    for c in (a.time, a.group):
         if c and c not in df.columns:
             raise SystemExit(
                 f"Column '{c}' is not in the data. Columns: {list(df.columns)[:30]}"
@@ -390,7 +351,7 @@ def main():
     if a.sample and a.sample < total:
         df = df.sample(a.sample, random_state=a.seed).sort_index()
 
-    result = profile(df, a.target, a.time, a.group)
+    result = profile(df, a.time, a.group)
     result["source"] = str(a.data)
     result["rows_in_file_read"] = total
     print_report(result, a.data, len(df), total, a.max_cols)

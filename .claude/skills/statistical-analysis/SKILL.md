@@ -34,7 +34,7 @@ Common: `--n-boot 2000` (minimum 1000, enforced), `--seed 0`, `--alpha 0.05`. Ou
 
 - **Effect size and interval before p-value.** A tiny p-value with a negligible effect is a
   detectable nothing. A large p-value is not evidence of no difference: read the interval.
-- **State the comparison before you look.** Trying many splits and reporting the one that
+- **State the comparison before you look.** Trying many subgroups and reporting the one that
   "worked" is multiple comparisons; count them, and correct (Bonferroni or Holm) or say you did not.
 - **Check the assumptions you lean on.** Independence (repeated customers are not independent rows:
   aggregate to the customer or resample by group), sample size per group, heavy tails (prefer the
@@ -46,5 +46,4 @@ Common: `--n-boot 2000` (minimum 1000, enforced), `--seed 0`, `--alpha 0.05`. Ou
 
 ## Data hygiene
 
-Rows with missing values in the columns used are dropped and counted (`n_dropped…`). Do not run
-comparisons on a test partition or an eval golden set's test split.
+Rows with missing values in the columns used are dropped and counted (`n_dropped…`).

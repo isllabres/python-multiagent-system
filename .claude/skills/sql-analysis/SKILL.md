@@ -12,14 +12,14 @@ persists, so experimenting is safe.
 Q=.claude/skills/sql-analysis/scripts/sql_query.py
 python3 $Q --table orders=data/orders.csv --table users=data/users.parquet --schema
 python3 $Q --table orders=data/orders.csv --query "select ..." [--limit 50] [--out result.csv]
-python3 $Q --table orders=data/orders.csv --file experiments/<id>/scripts/q1.sql
+python3 $Q --table orders=data/orders.csv --file analysis/<id>/scripts/q1.sql
 python3 $Q --table orders=data/orders.csv --query "select ..." --explain
 ```
 
 `--sample N` loads a random sample of each table (seed echoed) for a quick look at very large
 files. Only `SELECT`, `WITH` and `EXPLAIN` are accepted. The output shows at most `--limit` rows
 plus the total row count and elapsed time (it flags anything over 30 s). `--out` saves the whole
-result (`.csv` or `.parquet`). Keep queries worth re-running in `experiments/<id>/scripts/*.sql`.
+result (`.csv` or `.parquet`). Keep queries worth re-running in `analysis/<id>/scripts/*.sql`.
 
 ## Dialect: SQLite
 
@@ -67,6 +67,3 @@ from t group by segment order by n desc;
 For statistics (tests, intervals) and charts, hand the result to `statistical-analysis` and
 `analysis-report`: SQL is for shaping the data, not for inference.
 
-## Rules
-
-Do not query a test partition or an eval golden set's test split.

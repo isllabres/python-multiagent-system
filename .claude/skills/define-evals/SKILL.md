@@ -1,25 +1,27 @@
 ---
 name: define-evals
-description: Precise EDD spec for LLM/agent behaviour — failure hypotheses, binary evals (code or judge), synthetic data if needed. Writes no code.
+description: Precise EDD (evaluation-driven development) spec for behaviour a unit test cannot pin down — measured or non-deterministic behaviour judged over a fixed set of cases against a bar. Writes no code. Use for criteria classified as `eval`.
 ---
 
-LLM evaluation architect. You produce the specification; you never run evals nor write eval
-code.
+Evaluation architect. You produce the specification; you never run evals nor write eval code.
 
-**Scope**: the quality of LLM/agent output — judges, golden sets, retrieval, tool use, format. It
-does not cover the statistical performance of a trained model — that is `define-metrics`, whose
-verdict is a confidence interval, not a per-case pass/fail.
+**Scope**: behaviour judged over a *set of cases* against a bar, rather than one input with one
+exact output. Performance budgets (latency, memory, throughput), output quality (a renderer, a
+parser recovering from messy input, a ranking), non-deterministic behaviour (retries, timing,
+concurrency), compatibility across versions or platforms. If the same input always gives the same
+output, it is a test: that is `define-tests`. A failing test is a bug; a failing eval is a
+regression against a bar.
 
-If there is a golden dataset, read it: its schema constrains everything that follows. Every eval
+If a case set already exists, read it: its schema constrains everything that follows. Every eval
 must reference which cases exercise it; if cases are missing for a failure mode, call it a
 "coverage gap", do not invent them.
 
 ## Phase 1 — Failure hypotheses
 
-Specification (it was never told what to do), generalisation (it was told, but fails on a
-variation), retrieval (if RAG: wrong document, overloaded context), tool use (wrong tool,
-malformed parameters), output format, domain-specific. For each one: **is this a prompt failure,
-or does it need an evaluator?** A specification failure is fixed in the prompt, not with an eval.
+Ways the behaviour can miss the bar: specification (it was never said what to do), regression
+(it used to meet the bar), edge inputs, resource limits, environment variance (platform, Python
+version, dependency version), flakiness. For each one: **is this a defect in the spec, or does it
+need an evaluator?** A specification defect is fixed in the spec, not with an eval.
 
 ## Phase 2 — Eval definitions
 
@@ -27,32 +29,38 @@ Only for what survived Phase 1:
 
 ```
 ### Eval: [name]
-**Failure mode**: ...   **Type**: Code assertion | LLM-as-Judge   **Verdict**: Pass/Fail
-**Pass/fail criterion**: [exact, unambiguous]   **Priority**: Critical|High|Med|Low
-**Golden set coverage**: the cases that exercise it, or "coverage gap"
-For a Judge: the judge prompt, at least 20 labelled examples to calibrate (100+ is better),
-target true positive/negative rate.
+**Failure mode**: ...   **Check**: Code assertion | Rubric   **Verdict**: Pass/Fail per case
+**Pass criterion**: [exact, unambiguous, for one case]
+**Bar**: [over the whole case set — "at least 95% of cases pass", "p95 under 200 ms"]
+**Priority**: Critical|High|Med|Low
+**Case coverage**: the cases that exercise it, or "coverage gap"
+For a Rubric check: the written rubric, and agreement between two reviewers on at least 20
+labelled cases, reported as a number.
 ```
 
-## Phase 3 — Synthetic data (if there are no real traces)
+## Phase 3 — Cases (when there are none yet)
 
-3-5 dimensions of relevant variation, 3-5 values each, 10 hand-made tuples before generating in
-bulk. Structured tuples first, natural language second — never "give me some test questions"
-straight off.
+3-5 dimensions of relevant variation, 3-5 values each, 10 cases written by hand before generating
+more. Structured cases first, free-form ones after. Any generation is seeded, so the same set comes
+back every time.
 
 ## Phase 4 — Summary
 
-A table `Eval | Type | Priority | Cost | When (CI/production)`. Then: the golden set used or
-recommended; the error-review cadence; the minimum number of traces before trusting the result
-(100); what to fix in the prompt before building evaluators; **what NOT to evaluate** — never
-generic metrics (helpfulness, coherence, BERTScore): they are noise dressed up as rigour.
+A table `Eval | Check | Priority | Cost | When (CI / pre-release)`. Then: the case set used or
+recommended; how often failures are reviewed; the minimum number of cases before trusting the
+result (50: below that, one case moves the result by two points); what to fix in the spec before
+building evaluators; and **what NOT to evaluate** — anything with no pass/fail bar, such as a
+generic quality score nobody can act on.
 
 ## Output
 
-Orchestrated: return markdown, do not persist. Direct: `evals/<slug>/EVAL_SPEC.md`.
+Orchestrated: return markdown, persist nothing. Direct: `evals/<slug>/EVAL_SPEC.md`.
+
+In `ACCEPTANCE.yaml` an eval criterion is `verification: eval`, with `reference:` the eval id under
+`evals/` and `threshold:` the bar.
 
 ## Non-negotiable
 
-Binary verdicts only. Never "helpfulness" or its like. Ground-truth code before LLM-as-Judge
-whenever possible. One eval, one failure mode. PII, SQL injection, profanity → an inline
-guardrail, not an asynchronous evaluator.
+A binary verdict per case, and a bar for the whole set. A code assertion before a rubric whenever
+possible. One eval, one failure mode. Cases are versioned in `evals/`, and a case is never changed
+to make an eval pass: that is the same offence as editing a test to make it pass.

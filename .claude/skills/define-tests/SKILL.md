@@ -59,5 +59,5 @@ I invoke you directly: `tests/specs/<slug>/TEST_SPEC.md`.
 ## Non-negotiable
 
 Behaviour, never implementation — the suite survives any refactor that preserves behaviour. One
-assert per behaviour. Concrete values, never "the correct result". **Never a model metric here**:
-that is `define-metrics`.
+assert per behaviour. Concrete values, never "the correct result". **Never a measured bar here**:
+behaviour judged over cases against a threshold is `define-evals`.
