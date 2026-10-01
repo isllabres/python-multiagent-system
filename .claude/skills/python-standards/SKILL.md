@@ -1,13 +1,14 @@
 ---
 name: python-standards
-description: The shared standard for what good Python looks like in this project — structure, typing, language semantics and traps, error handling, data code (pandas, numpy), performance, security and tooling (uv, ruff, mypy, pytest). Carried by the developer who writes the code and the validator who judges it, so both work from one rubric.
+description: The shared standard for what good Python looks like in this project — structure, typing, language semantics and traps, error handling, data code (pandas, numpy), performance, security and tooling (uv, ruff, mypy, pytest). Carried by the developer who writes the code, the tester who writes the tests and the validator who judges both, so all three work from one rubric.
 ---
 
 Pythonic means clear, explicit and consistent with the project, not clever. **The project's existing
 conventions win over anything below**; where it has none, use this. Target Python 3.11+.
 
-The developer uses this as the way to write; the validator uses it as the list of things to check.
-Each rule says why it matters, so a finding can name the consequence and not just cite a rule.
+The developer and the tester use this as the way to write; the validator uses it as the list of
+things to check. Each rule says why it matters, so a finding can name the consequence and not just
+cite a rule.
 
 ## Structure
 
