@@ -40,6 +40,13 @@ establishes them before anyone touches code. If they contradict a criterion — 
 since the issue was created — **stop and comment on the issue** with the evidence; do not
 implement against a criterion that is already unreachable.
 
+## Step 3b — Wiki coverage (`wiki-generator`, only if the area has no entries)
+
+The wiki is the map the other roles read before the code (`project-wiki`). Look up the modules the
+issue touches (its technical notes, or `git grep` for the names it uses). If the wiki has no entries
+for them, `manager` has `wiki-generator` survey that area now, so that `tester`, `developer` and
+`validator` can go straight to the right symbols instead of reading the code wholesale.
+
 ## Step 4 — Per criterion: red, green and converge
 
 For each criterion in `ACCEPTANCE.yaml`, in order. After **every** commit below, fix commits
@@ -85,19 +92,16 @@ the cap is exhausted.
 
 ## Step 6 — Wiki check
 
-`wiki-generator` already ran after every commit: it appended one changelog line to `wiki/log.md`
-and edited a page only where behaviour or architecture changed. Verify nothing was skipped. Every
-commit of the branch except the `wiki(...)` ones must have its line:
+`wiki-generator` already ran after every commit. Verify nothing was skipped and nothing rotted:
 
 ```bash
-for sha in $(git log --reverse --format=%h --invert-grep --grep='^wiki(' <default-branch>..HEAD); do
-  grep -q "$sha" wiki/log.md || echo "missing from the changelog: $sha"
-done
+python3 .claude/skills/project-wiki/scripts/check_wiki.py --base <default-branch>
 ```
 
-For each one missing, `manager` calls `wiki-generator` with that hash. Check also that
-`wiki/_Sidebar.md` still links to all six pages. `README.md` is not touched here — it is the
-system's front door, not the project's.
+It fails if a commit of the branch has no line in `wiki/log.md`, if an anchor points at a file or
+symbol that no longer exists, if a link is broken, or if a page, a changelog line or a decision is
+over its size limit. `manager` has `wiki-generator` fix whatever it reports, and runs it again.
+`README.md` is not touched here — it is the system's front door, not the project's.
 
 ## Step 7 — Verify and assemble the local PR
 
