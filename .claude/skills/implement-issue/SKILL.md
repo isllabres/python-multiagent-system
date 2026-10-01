@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: Launches the full multi-agent cycle over an issue — per criterion, then integration, then wiki — and assembles a local PR. Does not touch GitHub until you confirm.
+description: Launches the full multi-agent cycle over an issue — per criterion, then the whole change, then wiki — and assembles a local PR. Does not touch GitHub until you confirm.
 argument-hint: "<issue number>"
 ---
 
@@ -51,7 +51,7 @@ For each criterion in `ACCEPTANCE.yaml`, in order:
    checks that the tests are intact, `manager` checks conformance to the spec, including that the
    red test is the right one.
 4. If either of them has a blocking finding, `manager` records the round: criterion, who raised
-   it, the finding. Rounds are counted per criterion, shared with the integration loop in Step 5.
+   it, the finding. Rounds are counted per criterion, shared with the whole-change loop in Step 5.
    If this would be the 4th round, **stop**, comment the blockage on the issue with the full
    history, and wait for instructions.
 
@@ -127,7 +127,7 @@ Report the URL. **It does not merge, does not approve, does not close the issue.
 
 ## Principles
 
-1. **The round cap is counted per criterion, across the per-criterion loop and the integration
+1. **The round cap is counted per criterion, across the per-criterion loop and the whole-change
    one.** A fix that moves from one loop to the other does not reset the counter.
 2. **Nothing touches GitHub before Step 8.**
 3. **The wiki is updated once, at the end, when everything has truly converged** — never in the

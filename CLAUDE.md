@@ -50,8 +50,8 @@ All work starts at an issue and ends at a PR. Three points require a person:
 | **Merge** | you review the PR on GitHub | You approve or request changes. Merging IS accepting the result |
 
 `/implement-issue` runs without pausing until the local PR is assembled — data facts,
-implementation per criterion, integration, wiki. It does not ask permission halfway. But it does
-not touch GitHub until you confirm the local PR.
+implementation per criterion, whole-change checks, wiki. It does not ask permission halfway. But it
+does not touch GitHub until you confirm the local PR.
 
 ## Six roles, two convergence loops
 
