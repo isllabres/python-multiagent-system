@@ -18,8 +18,8 @@ against 20.6% in the west"), not adjectives. Lead with what matters most, not wi
 
 ## Build it
 
-Write a script (`experiments/<id>/scripts/report.py`), run it with `python3`, save the output under
-`experiments/<id>/`:
+Write a script (`analysis/<id>/scripts/report.py`), run it with `python3`, save the output under
+`analysis/<id>/`:
 
 ```python
 import sys; sys.path.insert(0, ".claude/skills/analysis-report/scripts")
@@ -36,7 +36,7 @@ fig.update_layout(title="Revenue by region", yaxis_title="Revenue (EUR)")
 r.figure(fig, caption="Sum of order value, complete quarter")
 r.table(summary_df, caption="Per-region detail")
 r.recommendations(["Test a north-specific offer (expected +2 pts, see section 2).", "..."])
-r.save("experiments/revenue/report.html")      # prints: Saved: experiments/revenue/report.html
+r.save("analysis/revenue/report.html")      # prints: Saved: analysis/revenue/report.html
 ```
 
 `Report` applies the `simple_white` template and a colour-blind-safe palette to every figure, loads

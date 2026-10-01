@@ -15,7 +15,7 @@ Import it from your analysis script:
     fig.update_layout(title="Revenue by region", yaxis_title="Revenue (EUR)")
     r.figure(fig, caption="Source: orders.csv, complete quarter")
     r.recommendations(["Do X because Y (evidence).", "Do Z."])
-    r.save("experiments/sales/report.html")           # prints "Saved: experiments/sales/report.html"
+    r.save("analysis/sales/report.html")           # prints "Saved: analysis/sales/report.html"
 
 Design rules baked in: each chart is its own figure, drawn with the `simple_white` template and a
 colour-blind-safe palette; Plotly is loaded ONCE in <head> (from the CDN by default; save(offline=True)
