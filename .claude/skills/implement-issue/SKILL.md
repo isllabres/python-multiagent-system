@@ -4,8 +4,9 @@ description: Launches the full multi-agent cycle over an issue — per criterion
 argument-hint: "<issue number>"
 ---
 
-`manager` coordinates this whole sequence. Nothing is pushed or opened on GitHub until Step 8, and
-only with your explicit confirmation.
+`manager`, the main agent, coordinates this whole sequence: it delegates to the other roles, hands
+findings to whoever owns the code, and keeps the round tally. It does not review the code. Nothing
+is pushed or opened on GitHub until Step 8, and only with your explicit confirmation.
 
 Detect the repository with `gh repo view`. If `gh auth status` fails, stop.
 
@@ -45,19 +46,20 @@ For each criterion in `ACCEPTANCE.yaml`, in order:
 
 1. `tester` writes the test or eval from the spec, watches it fail for the right reason, and
    commits `red(#$ARGUMENTS-<AC>):`.
-2. `developer` writes the minimum that turns it green and commits `green(#$ARGUMENTS-<AC>):`. It
+2. `manager` checks that the red test is the right check for the criterion — its statement, its
+   verification, its bar. If not, it goes back to `tester` and the round is recorded.
+3. `developer` writes the minimum that turns it green and commits `green(#$ARGUMENTS-<AC>):`. It
    never touches the test.
-3. `tester` and `manager` review the same diff, each through their own lens — `tester` runs it and
-   checks that the tests are intact, `manager` checks conformance to the spec, including that the
-   red test is the right one.
-4. If either of them has a blocking finding, `manager` records the round: criterion, who raised
-   it, the finding. Rounds are counted per criterion, shared with the whole-change loop in Step 5.
-   If this would be the 4th round, **stop**, comment the blockage on the issue with the full
-   history, and wait for instructions.
-
-   Within the cap: `developer` fixes (a test it thinks is wrong goes to `manager`, who decides
-   between `tester` fixing the test and the spec changing), and goes back to step 3.
-5. No blocking findings → next criterion.
+4. `tester` checks the green: runs it and everything before it, checks that the tests are intact,
+   that nothing hardcodes the test's inputs, and that the diff does no more than the criterion asks.
+   `manager` does not review the code.
+5. If `tester` has a blocking finding, `manager` records the round — criterion, the finding — and
+   hands it to `developer`, who fixes it (a test it thinks is wrong goes to `manager`, who decides
+   between `tester` fixing the test and the spec changing) and goes back to step 4. Rounds are
+   counted per criterion, shared with the whole-change loop in Step 5. If this would be the 4th
+   round, **stop**, comment the blockage on the issue with the full history, and wait for
+   instructions.
+6. No blocking findings → next criterion.
 
 ## Step 5 — Whole change: `tester`, then `validator`
 
@@ -70,20 +72,20 @@ reviews code that will not move because of a failing test.
 
 **If anything fails:**
 
-Whoever found it opens a conversation with the owner of the code, describing the symptom with
-literal evidence and not proposing the fix: `tester` with `developer`; `validator` with `developer`
-for production code, or with `tester` for tests, evals and fixtures. A fix that touches code goes
-back through `tester` (suite and integrity) and `manager` (conformance) before it is closed — it
-is never skipped for looking trivial. Every round is recorded on the same per-criterion counter as
-Step 4: accumulated, not reset.
+`tester` or `validator` reports it to `manager` with literal evidence and without proposing the
+fix. `manager` records the round and hands it to the owner of the code: `developer` for production
+code, `tester` for tests, evals and fixtures. A fix that touches code goes back through `tester`
+(suite and integrity) before it is closed — it is never skipped for looking trivial. Every round
+is recorded on the same per-criterion counter as Step 4: accumulated, not reset.
 
 After a Python fix `tester` re-runs the suite and `validator` re-validates the files it touched.
 Repeat until everything passes or the cap is exhausted.
 
 ## Step 6 — Wiki (`wiki-generator`, called by `developer`)
 
-With `tester` and `validator` converged, **`developer` calls `wiki-generator`** — not `manager` — because they hold the full context of what was built. It
-updates the relevant pages of the project wiki, and `wiki/log.md` gets its entry.
+With `tester` and `validator` converged, **`developer` calls `wiki-generator`** — not `manager` —
+because they hold the full context of what was built. It updates the relevant pages of the project
+wiki, and `wiki/log.md` gets its entry.
 
 `README.md` is not touched here — it is the system's front door, not the project's.
 
@@ -137,4 +139,4 @@ Report the URL. **It does not merge, does not approve, does not close the issue.
    before `developer`'s `green(...)` one, and no `green(...)` commit touches a test.
 6. `tester` and `validator` diagnose, never implement. `developer` writes production code and, on
    convergence, is the one who invokes `wiki-generator` — it does not decide what is blocking in
-   its own code.
+   its own code. `manager` owns the spec and coordinates; it does not review code.
