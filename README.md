@@ -32,9 +32,9 @@ An **agent** (`.claude/agents/`) is an identity: its own system prompt, a model,
 | `manager` | opus | The spec creator and the main agent: interrogates until it converges, writes the issue, runs the other roles and keeps the round tally. Does not review code |
 | `analyst` | sonnet | Any data analysis: explore, query, statistics, charts, reports |
 | `tester` | sonnet | Owns the tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, then runs the whole suite and guards against tests bent to pass. Never writes production code |
-| `developer` | sonnet | Python implementation expert: makes the red green, one criterion at a time, exactly as the spec says. Never touches a test. Calls `wiki-generator` at the end |
+| `developer` | sonnet | Python implementation expert: makes the red green, one criterion at a time, exactly as the spec says. Never touches a test |
 | `validator` | opus | Judges the whole change as Python (semantics, structure, tooling; consults The Python Wiki on its first call) and gives feedback to `developer`. Read-only: never runs the suite |
-| `wiki-generator` | sonnet | Compiles what was learned into the wiki, once per issue |
+| `wiki-generator` | sonnet | Keeps the wiki in step with the code, briefly: one changelog line per commit, and a page edited only when behaviour or architecture changed. Called by `manager` after every commit |
 
 
 A **skill** (`.claude/skills/`) is a named procedure inserted into the **current** conversation, with `$ARGUMENTS` substituted. It is not an identity: it runs in your session, and its body can instruct "delegate to `tester`, then to `developer`" — the skill orchestrates, the agent executes. Skills come in two kinds: workflows you launch yourself with `/name`, and methodology that another role invokes when it needs it.
@@ -45,7 +45,7 @@ A **skill** (`.claude/skills/`) is a named procedure inserted into the **current
 |---|---|---|
 | `/grill-me` | Interrogates in depth, one question at a time, with a recommendation and prior exploration. Standalone or inside `/create-issue` | Yes, it is a conversation |
 | `/create-issue` | Light discovery, data facts, invokes the skills, files the issue | **Yes** — you approve before anything is created |
-| `/implement-issue` | Per criterion (red, green) → whole change (suite, Python review) → wiki → **local PR**, in one go | **Yes** — you confirm the local PR before it touches GitHub |
+| `/implement-issue` | Per criterion (red, green) → whole change (suite, Python review) → **local PR**, in one go, with the wiki updated after every commit | **Yes** — you confirm the local PR before it touches GitHub |
 | `/review-issue` | Detects whether a `pending` issue is still valid | Confirm before refreshing |
 | `/update-issue` | Applies a requested change by re-running `/create-issue` | Confirm labels |
 
@@ -75,7 +75,7 @@ Carried by `analyst`, which is called for any data analysis. Each bundles a test
 | Skill | Does |
 |---|---|
 | `python-standards` | One rubric for good Python here: structure, typing, language traps, errors and resources, idioms, pandas/numpy code, performance, security, tooling. `developer` and `tester` write against it and `validator` checks against it |
-| `commit-messages` | Short, descriptive commits with the `red(#n-ACx):` / `green(#n-ACx):` prefix. `tester` makes the red ones and `developer` the green ones |
+| `commit-messages` | Short, descriptive commits with the `red(#n-ACx):` / `green(#n-ACx):` prefix. `tester` makes the red ones, `developer` the green ones and `wiki-generator` the wiki ones |
 | `python-wiki-graph` | Builds a graph of The Python Wiki (an archive) on the validator's first call, so it can survey the sections, choose the pages that bear on the code it is validating, and read them in depth. One bounded, cached crawl; the wiki is asked for as little as possible |
 
 ## What you will find in the repository
@@ -91,7 +91,8 @@ CLAUDE.md                 The contract. The only document that has to be read in
 specs/                    The executable shadow of each issue.
 analysis/                 The analyst's scripts, profiles and reports.
 evals/                    The cases an eval is judged over.
-wiki/                     Native GitHub Wiki: Home, _Sidebar, six fixed pages, raw/, log.md.
+wiki/                     Native GitHub Wiki: Home, _Sidebar, six fixed pages, raw/, log.md
+                          (one changelog line per commit).
 ```
 
 Folders such as `src/`, `tests/` **are deliberately not in this list** — they are your project, not the multi-agent layer.
