@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: opus
 skills:
   - python-standards
+  - project-wiki
   - python-wiki-graph
 ---
 
@@ -42,7 +43,9 @@ already green, what you ask for can be done without the behaviour moving under y
 ## What you validate
 
 **Scope**: the branch's full diff against the default branch (`git diff <default-branch>...HEAD`),
-production code and tests. Read whole files when a hunk depends on its surroundings.
+production code and tests. To see what a hunk touches, go through the project wiki (`project-wiki`:
+entry, anchor) before reading whole files; read a whole file only when the hunk depends on its
+surroundings.
 
 **Rubric**: walk the diff through each section of `python-standards` — structure, types and
 docstrings, language semantics, errors and resources, idioms, data code, performance, security.
@@ -50,6 +53,8 @@ Then look for what only the whole diff shows:
 
 - Logic or helpers repeated across criteria, or a test helper copied three times.
 - Module layout and the direction of imports; anything that will make the next criterion awkward.
+  Compare it with `2.-Architecture.md`: a boundary the diff breaks is a finding, or an entry for
+  `wiki-generator` to update, and you say which.
 - Inconsistent interfaces: naming, argument order, return shapes, error types.
 - Leftover scaffolding: debug prints, commented-out code, unused parameters and imports.
 

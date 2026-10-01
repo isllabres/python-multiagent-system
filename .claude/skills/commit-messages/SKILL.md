@@ -1,6 +1,6 @@
 ---
 name: commit-messages
-description: How commit messages are written in this project — short, descriptive, one idea each, with the red/green prefix per criterion. Carried by the tester, who makes the red commits, and by the developer, who makes the green ones.
+description: How commit messages are written in this project — short, descriptive, one idea each, with the red/green/wiki prefix per criterion. Carried by the tester, who makes the red commits, the developer, who makes the green ones, and the wiki-generator, who makes the wiki ones.
 ---
 
 Someone reading `git log --oneline` should know what each commit does without opening it.
@@ -11,8 +11,11 @@ Someone reading `git log --oneline` should know what each commit does without op
 |---|---|---|
 | `red(#<issue>-<AC>): <the behaviour the test expects>` | `tester` | The test or eval exists and fails for the right reason. It goes in even though it fails |
 | `green(#<issue>-<AC>): <the change that turns it green>` | `developer` | The criterion's test or eval passes |
+| `wiki(#<issue>-<AC>): <what the wiki now says>` | `wiki-generator` | After every red or green commit. If it only logged the commit: `wiki(#<issue>-<AC>): log <hash>` |
+| `wiki(#<issue>): survey <area>` or `wiki(#<issue>): repair <what>` | `wiki-generator` | An area the wiki did not cover yet, or anchors reported stale. No changelog line |
 
-One commit per criterion per colour. Never `git add -A`: stage the files you touched by name.
+One commit per criterion per colour; each of them is followed by its own `wiki(...)` commit.
+Never `git add -A`: stage the files you touched by name.
 
 ## The subject
 
