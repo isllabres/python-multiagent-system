@@ -1,125 +1,95 @@
-# dev-lab
+# python-multiagent-system
 
-A multi-agent system for Python development, for Claude Code. It installs as a layer on top of a new or
-existing project, adding the roles and skills that coordinate the work. 
+A multi-agent system for Python development, for [Claude Code](https://claude.com/claude-code). It
+installs as a layer on top of a new or existing project and turns a GitHub issue into a pull
+request through six specialised roles. Each role has one job, so the one that writes the test is
+never the one that writes the code.
 
-Six roles, two convergence loops, red before green.
+```
+idea ── /create-issue ──▶ issue + spec ── /implement-issue ──▶ local PR ──▶ GitHub PR ──▶ merge
+          you approve                        you confirm                         you review
+```
+
+Three points need a person. Everything between them runs without asking.
 
 ## Install
 
+Requirements: Claude Code, `git`, `gh` (authenticated: no `gh`, no flow), `uv` and Python 3.11+.
+
 ```bash
-cp -r dev-lab/.claude dev-lab/CLAUDE.md ~/code/my-project/   # onto your existing project
+git clone https://github.com/isllabres/python-multiagent-system.git
+cp -r python-multiagent-system/.claude python-multiagent-system/CLAUDE.md ~/code/my-project/
 cd ~/code/my-project
 
 uv add --dev pytest ruff mypy
-gh auth status                          # mandatory: no gh, no flow
+gh auth status
 
 claude --agent manager
 > /grill-me "add retry with backoff to the HTTP client"
 ```
 
-The analysis skills use `pandas`, `numpy`, `scipy` and `plotly`; add them with `uv add --dev` the
-first time you ask the `analyst` for something.
+`claude --agent manager` starts your session as the main agent; it delegates to every other role.
 
-## Agents and skills — the distinction
+The layer adapts to your project and never creates `src/` or `tests/`. It creates only its own
+output: `specs/`, `analysis/`, `evals/` and `wiki/`. The analysis skills use `pandas`, `numpy`,
+`scipy` and `plotly`; add them with `uv add --dev` the first time you ask the `analyst` for something.
 
-An **agent** (`.claude/agents/`) is an identity: its own system prompt, a model, a set of tools, invoked by delegation and with its own context, with no memory of the main conversation beyond what is explicitly passed to it.
+## The six roles
 
-### The six agents
+An **agent** (`.claude/agents/`) is an identity: its own prompt, model, tools and context. Each one
+below owns one thing and never does the others'.
 
-| Role | Model | Does |
-|---|---|---|
-| `manager` | opus | The spec creator and the main agent: interrogates until it converges, writes the issue, runs the other roles and keeps the round tally. Does not review code |
-| `analyst` | sonnet | Any data analysis: explore, query, statistics, charts, reports |
-| `tester` | sonnet | Owns the tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, then runs the whole suite and guards against tests bent to pass. Never writes production code |
-| `developer` | sonnet | Python implementation expert: makes the red green, one criterion at a time, exactly as the spec says. Never touches a test |
-| `validator` | opus | Judges the whole change as Python (semantics, structure, tooling; consults The Python Wiki on its first call) and gives feedback to `developer`. Read-only: never runs the suite |
-| `wiki-generator` | sonnet | Keeps the wiki, the code map every other role reads first, in step with the code, briefly: one changelog line per commit, and an entry (with code anchors) edited only when behaviour or architecture changed. Called by `manager` after every commit; also surveys an area the wiki does not cover yet |
+| Role | Model | Owns | Never |
+|---|---|---|---|
+| `manager` | opus | The spec and the session: interrogates until the idea converges, writes the issue, runs the other roles, keeps the round tally, confirms the red test matches the criterion, decides disputes over a test or the spec | Reviews the code `developer` writes, or writes or runs code, tests or evals |
+| `analyst` | sonnet | Any data analysis: explore, query, statistics, charts, reports | Writes production code |
+| `tester` | sonnet | The tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, checks the green, guards against tests bent to pass, runs the whole suite | Edits production code |
+| `developer` | sonnet | The implementation: makes the red green with the minimum idiomatic, typed Python, one criterion at a time | Writes, edits, skips or deletes a test |
+| `validator` | opus | Python quality of the whole change (semantics, structure, ruff, mypy), with The Python Wiki as a reference, and the feedback to the owner of the code | Runs the suite, writes code (it is read-only) |
+| `wiki-generator` | sonnet | The project wiki: one changelog line per commit and an entry when behaviour or architecture changed; surveys areas the wiki does not cover yet | Touches `README.md`, `CLAUDE.md` or `wiki/raw/` |
 
+Only `manager` delegates to the other roles. `tester` and `validator` report back to it, and it hands
+each finding to whoever owns the code and keeps the count.
 
-A **skill** (`.claude/skills/`) is a named procedure inserted into the **current** conversation, with `$ARGUMENTS` substituted. It is not an identity: it runs in your session, and its body can instruct "delegate to `tester`, then to `developer`" — the skill orchestrates, the agent executes. Skills come in two kinds: workflows you launch yourself with `/name`, and methodology that another role invokes when it needs it.
+## How a change flows
 
-### The workflow skills, and the three points where it needs you
+### 1. Create the issue: `/create-issue`
 
-| Skill | What it does | Does it need you? |
-|---|---|---|
-| `/grill-me` | Interrogates in depth, one question at a time, with a recommendation and prior exploration. Standalone or inside `/create-issue` | Yes, it is a conversation |
-| `/create-issue` | Light discovery, data facts, invokes the skills, files the issue | **Yes** — you approve before anything is created |
-| `/implement-issue` | Per criterion (red, green) → whole change (suite, Python review) → **local PR**, in one go, with the wiki updated after every commit | **Yes** — you confirm the local PR before it touches GitHub |
-| `/review-issue` | Detects whether a `pending` issue is still valid | Confirm before refreshing |
-| `/update-issue` | Applies a requested change by re-running `/create-issue` | Confirm labels |
+`manager` runs a light discovery, then `/grill-me` interrogates in depth, one question at a time with
+its own recommendation, reading the project's wiki before it asks anything the code can answer. It
+decides whether the work is one issue or an epic (you approve the split), asks `analyst` for data
+facts if a criterion depends on data, has `define-tests` and `define-evals` write the specs, and
+files the issue together with `specs/<n>-<slug>/ACCEPTANCE.yaml`. **You approve before anything is
+created.**
 
-### The methodology skills
+### 2. Implement it: `/implement-issue <n>`
 
-Invoked by `manager` during `/create-issue`, not typed by you.
+- **Step 1.** Read the issue (a `pending` one suggests `/review-issue` first; an `epic` is not
+  implemented directly).
+- **Step 2.** Create the local branch `<n>-<slug>`. Nothing touches GitHub yet.
+- **Step 3.** If a criterion depends on data, `analyst` establishes the facts. If they contradict
+  it, the flow stops and comments on the issue.
+- **Step 3b.** If the wiki has no entries for the area the issue touches, `wiki-generator` surveys it.
+- **Step 4, per criterion.** `tester` writes the red check, `manager` confirms it matches the
+  criterion, `developer` makes it green, `tester` checks the result.
+- **Step 5, whole change.** `tester` runs the full suite and the evals, then `validator` reviews the
+  diff as Python. Findings go back to `developer` (or to `tester`, for tests).
+- **Step 6.** Check the wiki: every commit has its changelog line and no anchor points at missing code.
+- **Step 7.** Run `ruff`, `mypy` and `pytest`, assemble the local PR, and **show it to you**: diff,
+  commits, evidence, wiki.
+- **Step 8.** Only with your confirmation: push and open the PR. It never merges, approves or
+  closes the issue.
 
-| Skill | Produces |
-|---|---|
-| `define-tests` | The TDD spec: behaviours, test cases, doubles, red-green-refactor sequence |
-| `define-evals` | The EDD spec for behaviour judged over a set of cases against a bar: performance budgets, output quality, non-deterministic behaviour |
+After every commit in steps 4 and 5, `manager` calls `wiki-generator`.
 
-### The analysis skills
+### 3. Merge: you
 
-Carried by `analyst`, which is called for any data analysis. Each bundles a tested script under
-`scripts/`.
+You review the PR on GitHub. Merging is accepting the result.
 
-| Skill | Does |
-|---|---|
-| `data-profiling` | Profiles a file: types, nulls, sentinels, duplicates, identifier columns, time and entity structure |
-| `statistical-analysis` | Bootstrap CIs, group comparisons with effect sizes, proportions, correlations, sample-size calculations |
-| `sql-analysis` | SQL over local files (joins, cohorts, funnels, window functions) with bounded output |
-| `analysis-report` | Narrative HTML report with Plotly charts: finding first, recommendations last |
+### Keeping issues honest
 
-### The Python skills
-
-| Skill | Does |
-|---|---|
-| `python-standards` | One rubric for good Python here: structure, typing, language traps, errors and resources, idioms, pandas/numpy code, performance, security, tooling. `developer` and `tester` write against it and `validator` checks against it |
-| `commit-messages` | Short, descriptive commits with the `red(#n-ACx):` / `green(#n-ACx):` prefix. `tester` makes the red ones, `developer` the green ones and `wiki-generator` the wiki ones |
-| `project-wiki` | How every role uses the project wiki as a map of the code: find the entry, follow its anchor straight to the symbol, read only that. Also the entry format and a checker that fails on anchors pointing at code that no longer exists, broken links and size limits |
-| `python-wiki-graph` | Builds a graph of The Python Wiki (an archive) on the validator's first call, so it can survey the sections, choose the pages that bear on the code it is validating, and read them in depth. One bounded, cached crawl; the wiki is asked for as little as possible |
-
-## What you will find in the repository
-
-```
-CLAUDE.md                 The contract. The only document that has to be read in full.
-.claude/
-  agents/*.md             The six roles: who does the work.
-  skills/*/SKILL.md       The fifteen skills: five workflows you type (/create-issue, /grill-me, ...),
-                          two methodology skills that manager invokes, four analysis skills that
-                          analyst carries, three shared skills (Python, commit messages, and how to
-                          read the wiki as a code map), and the Python Wiki graph that
-                          validator runs first.
-specs/                    The executable shadow of each issue.
-analysis/                 The analyst's scripts, profiles and reports.
-evals/                    The cases an eval is judged over.
-wiki/                     Native GitHub Wiki: Home, _Sidebar, six fixed pages, raw/, log.md
-                          (one changelog line per commit).
-```
-
-Folders such as `src/`, `tests/` **are deliberately not in this list** — they are your project, not the multi-agent layer.
-
-## The wiki is the code map
-
-Every role reads the project wiki before it reads code. Its entries say what a part does and why,
-point at the code with anchors (`src/loader.py:load_rows`) and at the tests that verify it, and link
-to related entries. A role finds the entry, follows the anchor and reads that symbol, not the whole
-module. On an existing project the wiki starts empty, so before the work on an issue starts,
-`wiki-generator` surveys the area it touches. A checker fails on anchors that point at code that no
-longer exists, so the map cannot quietly rot:
-
-```bash
-python3 .claude/skills/project-wiki/scripts/check_wiki.py --base main
-```
-
-## Red before green
-
-There is no hook for it: it is a role. `tester` writes each criterion's test or eval and runs it
-before `developer` starts, and only commits it, as `red(#n-ACx):`, if it fails for the right reason
-(the behaviour is missing, not a typo in the test). `developer` then makes it pass and commits
-`green(#n-ACx):`, without ever editing a test. Afterwards `tester` checks the history: no `green`
-commit may touch a test, an eval runner or a case file, and no assertion may have been loosened,
-skipped or deleted.
+`/review-issue <n | --all>` checks whether a `pending` issue is still valid against today's code and
+data. `/update-issue <n> -- <change>` applies a change by re-running `/create-issue`.
 
 ## Two loops, one round budget
 
@@ -129,13 +99,122 @@ whole change:   tester (suite), then validator (Python) ↔ developer, or tester
                 a fix that touches code goes back through tester
 ```
 
-`manager` keeps one tally per criterion across **both** loops. Default cap: 3 rounds; the fourth
-stops and reports.
+`manager` keeps one tally per criterion across **both** loops, so a fix that moves from one loop to
+the other does not reset it. The cap is 3 rounds; the fourth stops, comments the history on the
+issue and waits for you.
 
-## Code quality: Ruff covers Black + Flake8 + isort
+## How a criterion is verified
 
-`ruff format` is a drop-in replacement for Black (same style, same output in practice).
-`ruff check` includes the equivalent of the Flake8 rules, and with the `I` set enabled, isort's.
-The three tools are not added separately: besides being redundant work, Black and Ruff can
-disagree on edge formatting decisions and end up fighting inside the same hook. `mypy` runs and is
-reported but does not block by default — it is optional.
+Every acceptance criterion is verified one of two ways, according to the nature of the verdict:
+
+| | Verdict | Example |
+|---|---|---|
+| **test** (TDD) | Binary, repeatable: same input, same output | "rejects a row with no identifier" |
+| **eval** (EDD) | Binary per case, with a bar over the case set | "at least 95% of the fixtures render", "p95 latency under 200 ms" |
+
+`ACCEPTANCE.yaml` is the issue's executable shadow, with exactly one verification per criterion:
+
+```yaml
+spec: 12-loader-validation
+criteria:
+  - id: AC1
+    statement: "Rejects a row with no identifier"
+    verification: test            # test | eval
+    reference: tests/test_loader.py::test_rejects_row_without_id
+    issue: 12
+```
+
+An `eval` criterion also carries a `threshold:` (the bar over its cases), and its `reference` is the
+eval id under `evals/`.
+
+## Red before green
+
+There is no hook for it: it is a role. `tester` writes each criterion's test or eval and runs it
+before `developer` starts, and commits it only if it fails for the right reason (the behaviour is
+missing, not a typo in the test). `developer` then makes it pass without ever editing a test.
+Afterwards `tester` checks the history: no `green` commit may touch a test, an eval runner or a case
+file, and no assertion may have been loosened, skipped or deleted.
+
+## The wiki is the code map
+
+Every role reads the project wiki (`wiki/`) before it reads code. Its entries say what a part does
+and why, point at the code with anchors (`src/loader.py:load_rows`) and at the tests that verify it,
+and link to related entries. A role finds the entry, follows the anchor and reads that symbol, not
+the whole module.
+
+```
+Home.md  _Sidebar.md  log.md  raw/
+1.-Configuration-and-Environment.md   2.-Architecture.md   3.-Features-and-Behaviour.md
+4.-Testing-and-Evaluation.md          5.-Decisions-and-Known-Issues.md   6.-Production-and-Monitoring.md
+```
+
+It is brief by rule: `log.md` gets exactly one line per commit; an entry is edited only when
+behaviour or architecture changed, or when something it points at moved; at most two pages per
+commit, five new lines at most, a page past 100 lines is condensed. A checker enforces this and fails
+on anchors pointing at code that no longer exists:
+
+```bash
+python3 .claude/skills/project-wiki/scripts/check_wiki.py --base main
+```
+
+On an existing project the wiki starts empty and fills area by area, as issues touch them.
+
+## Commits
+
+One commit per criterion and colour, subjects of 72 characters at most, imperative, naming the
+behaviour. A criterion's history reads:
+
+```
+red(#12-AC1): reject rows without customer_id            tester
+wiki(#12-AC1): log 3f1f4c0                               wiki-generator
+green(#12-AC1): validate customer_id in load_rows        developer
+wiki(#12-AC1): document customer_id validation           wiki-generator
+```
+
+## Skills
+
+A **skill** (`.claude/skills/`) is a named procedure loaded into the current conversation. It is
+not an identity: the skill orchestrates, the agent executes.
+
+| Skill | What it does |
+|---|---|
+| `/grill-me` | Interrogates a plan in depth, one question at a time, with a recommendation. Standalone or inside `/create-issue` |
+| `/create-issue` | Discovery, grilling, data facts, specs, then files the issue. You approve before it is created |
+| `/implement-issue` | The eight steps above, ending in a local PR you confirm |
+| `/review-issue` | Detects whether a `pending` issue is still valid |
+| `/update-issue` | Applies a requested change to an existing issue |
+| `define-tests` | The TDD spec: behaviours, cases, doubles, red-green-refactor sequence (used by `manager`) |
+| `define-evals` | The EDD spec: cases judged against a bar, for performance, output quality or non-deterministic behaviour (used by `manager`) |
+| `data-profiling` | Profiles a file: types, nulls, sentinels, duplicates, identifiers, time and entity structure (`analyst`) |
+| `statistical-analysis` | Bootstrap CIs, group comparisons with effect sizes, proportions, correlations, sample sizes (`analyst`) |
+| `sql-analysis` | SQL over local files, with bounded output (`analyst`) |
+| `analysis-report` | A narrative HTML report with Plotly charts, finding first (`analyst`) |
+| `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling. `developer` and `tester` write against it, `validator` checks against it |
+| `commit-messages` | The `red`, `green` and `wiki` commit conventions, shared by `tester`, `developer` and `wiki-generator` |
+| `project-wiki` | How every role reads the wiki as a code map, the entry format, and the checker |
+| `python-wiki-graph` | On the validator's first call, builds a cached graph of The Python Wiki (an archive) so it can pick the pages that bear on the code it is validating. One bounded crawl, polite to the site |
+
+## What you will find in the repository
+
+```
+CLAUDE.md                 The contract. The only document that has to be read in full.
+.claude/
+  agents/*.md             The six roles.
+  skills/*/SKILL.md       The fifteen skills, with the scripts and tests that go with them.
+specs/                    The executable shadow of each issue.
+analysis/                 The analyst's scripts, profiles and reports.
+evals/                    The cases an eval is judged over.
+wiki/                     A native GitHub Wiki: the code map and the changelog.
+```
+
+`src/`, `tests/` and the rest are your project, not this layer.
+
+## Code quality
+
+Before any local PR is shown: `uv run ruff check .`, `uv run ruff format --check <touched paths>`,
+`uv run mypy <touched paths>` and `uv run pytest -q`. `mypy` is reported but does not block, by
+design; a blocking check is never relaxed to turn it green.
+
+`ruff format` is a drop-in replacement for Black and `ruff check` covers the Flake8 rules (and
+isort's, with the `I` set), so the three tools are not added separately: Black and Ruff can disagree
+on edge cases and end up fighting inside the same hook.
