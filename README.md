@@ -12,27 +12,94 @@ idea ── /create-issue ──▶ issue + spec ── /implement-issue ──�
 
 Three points need a person. Everything between them runs without asking.
 
-## Install
+## Install into a new project
+
+The layer is a set of files you copy into your project. Your project keeps its own git remote:
+nothing here points back to this repository, and `gh` reads the repository from your project's
+remote.
 
 Requirements: Claude Code, `git`, `gh` (authenticated: no `gh`, no flow), `uv` and Python 3.11+.
 
 ```bash
-git clone https://github.com/isllabres/python-multiagent-system.git
-cp -r python-multiagent-system/.claude python-multiagent-system/CLAUDE.md ~/code/my-project/
-cd ~/code/my-project
+# 1. Get the layer, once
+git clone https://github.com/isllabres/python-multiagent-system.git ~/code/python-multiagent-system
 
+# 2. Export a clean snapshot of its main branch into your project (tracked files only)
+git -C ~/code/python-multiagent-system archive origin/main .claude CLAUDE.md | tar -x -C ~/code/my-project
+
+# 3. Tooling, in your project
+cd ~/code/my-project
 uv add --dev pytest ruff mypy
 gh auth status
 
+# 4. Commit the layer to your project's own repository, on its own branch
+git switch -c add-multiagent-layer
+git add .claude CLAUDE.md
+git commit -m "Add the python-multiagent-system layer"
+git push -u origin add-multiagent-layer
+
+# 5. Start working
 claude --agent manager
 > /grill-me "add retry with backoff to the HTTP client"
 ```
 
+`git archive` is used instead of `cp -r` because it copies only tracked files, so no `.DS_Store` or
+local cache comes along, and it is the same command that updates the layer later.
 `claude --agent manager` starts your session as the main agent; it delegates to every other role.
 
-The layer adapts to your project and never creates `src/` or `tests/`. It creates only its own
-output: `specs/`, `analysis/`, `evals/` and `wiki/`. The analysis skills use `pandas`, `numpy`,
-`scipy` and `plotly`; add them with `uv add --dev` the first time you ask the `analyst` for something.
+### Which remote
+
+Any GitHub repository: your own, another account or organisation, or GitHub Enterprise. `gh` must be
+logged in to it: `gh auth switch` for another account, `gh auth login --hostname <host>` for
+Enterprise. GitLab and Bitbucket are not supported, because the flow is built on GitHub issues and
+pull requests.
+
+### Before you start
+
+- **Ruff lints the layer too.** Your `ruff check .` also covers the layer's scripts. Under a strict
+  config (`select = ["ALL"]`) that is hundreds of findings, so exclude it. With ruff's default
+  config the layer is clean, and pytest skips `.claude/` on its own.
+
+  ```toml
+  [tool.ruff]
+  extend-exclude = [".claude"]
+  ```
+
+- **An existing `CLAUDE.md` is overwritten by step 2**, and so is any agent or skill of yours with
+  the same name. If you have a `CLAUDE.md`, export only `.claude`, put ours beside yours under
+  another name, and import it from yours:
+
+  ```bash
+  git -C ~/code/python-multiagent-system archive origin/main .claude | tar -x -C ~/code/my-project
+  git -C ~/code/python-multiagent-system archive origin/main CLAUDE.md | tar -xO > ~/code/my-project/CLAUDE.multiagent.md
+  ```
+
+  then add the line `@CLAUDE.multiagent.md` to your `CLAUDE.md`. Claude Code imports files with
+  `@path`, resolved relative to the file that mentions it.
+- **The wiki starts empty.** `wiki-generator` creates `wiki/` on its first call, and `check_wiki.py`
+  reports missing pages until then.
+- **The first `validator` run needs the network.** It crawls The Python Wiki once (about a minute, at
+  most 80 requests) and caches it for 180 days in `.claude/cache/`, which git-ignores itself.
+- **Your layout is respected.** The layer never creates `src/` or `tests/`; it creates only its own
+  output: `specs/`, `analysis/`, `evals/` and `wiki/`. The analysis skills use `pandas`, `numpy`,
+  `scipy` and `plotly`; add them with `uv add --dev` the first time you ask the `analyst` for
+  something.
+
+### Updating the layer
+
+```bash
+git -C ~/code/python-multiagent-system fetch origin
+git -C ~/code/python-multiagent-system archive origin/main .claude | tar -x -C ~/code/my-project
+
+# the contract: run the line that matches how you installed it, never both
+git -C ~/code/python-multiagent-system archive origin/main CLAUDE.md | tar -x -C ~/code/my-project
+git -C ~/code/python-multiagent-system archive origin/main CLAUDE.md | tar -xO > ~/code/my-project/CLAUDE.multiagent.md
+```
+
+The first `CLAUDE.md` line is for a project that uses ours as its `CLAUDE.md`; the second is for one
+that keeps ours as `CLAUDE.multiagent.md` and imports it. Running the first on your own `CLAUDE.md`
+overwrites it. Then read `cd ~/code/my-project && git diff --stat` before you commit: files are
+overwritten, but a file removed upstream is not deleted from your project.
 
 ## The six roles
 
