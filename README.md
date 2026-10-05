@@ -40,12 +40,11 @@ git push -u origin add-multiagent-layer
 
 # 5. Start working
 claude --agent manager
-> /grill-me "add retry with backoff to the HTTP client"
 ```
 
 `git archive` is used instead of `cp -r` because it copies only tracked files, so no `.DS_Store` or
-local cache comes along, and it is the same command that updates the layer later.
-`claude --agent manager` starts your session as the main agent; it delegates to every other role.
+local cache comes along. `claude --agent manager` starts your session as the main agent; it
+delegates to every other role.
 
 ### Which remote
 
@@ -85,21 +84,18 @@ pull requests.
   `scipy` and `plotly`; add them with `uv add --dev` the first time you ask the `analyst` for
   something.
 
-### Updating the layer
+### Use it
 
-```bash
-git -C ~/code/python-multiagent-system fetch origin
-git -C ~/code/python-multiagent-system archive origin/main .claude | tar -x -C ~/code/my-project
+Inside the session, three commands take you from an idea to a pull request:
 
-# the contract: run the line that matches how you installed it, never both
-git -C ~/code/python-multiagent-system archive origin/main CLAUDE.md | tar -x -C ~/code/my-project
-git -C ~/code/python-multiagent-system archive origin/main CLAUDE.md | tar -xO > ~/code/my-project/CLAUDE.multiagent.md
+```
+> /grill-me "add retry with backoff to the HTTP client"   # optional: stress-test a raw idea first
+> /create-issue feature     # discovery, interrogation and specs; you approve, it files the issue
+> /implement-issue 12       # red, green, checks, wiki; stops at a local PR for you to confirm
 ```
 
-The first `CLAUDE.md` line is for a project that uses ours as its `CLAUDE.md`; the second is for one
-that keeps ours as `CLAUDE.multiagent.md` and imports it. Running the first on your own `CLAUDE.md`
-overwrites it. Then read `cd ~/code/my-project && git diff --stat` before you commit: files are
-overwritten, but a file removed upstream is not deleted from your project.
+After you confirm, it pushes the branch and opens the PR on your remote. You review it on GitHub;
+merging is accepting the result. The whole flow is described under *How a change flows*.
 
 ## The six roles
 
