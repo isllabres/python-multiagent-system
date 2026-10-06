@@ -39,5 +39,5 @@ Never `git add -A`: stage the files you touched by name.
 ## Fix rounds
 
 A commit made in a fix round keeps its colour's prefix and says what the change does ("reject empty
-ids"), not that it answers a review. If a fix changes a test or eval, `tester` makes it, as a
-`red(...)` commit; a `green(...)` commit never touches a test, an eval runner or a case file.
+ids"), not that it answers a review. If a fix changes a test or eval — a disputed test, or a
+finding in the test code — `tester` makes it, as a `red(...)` commit; a `green(...)` commit never touches a test, an eval runner or a case file.

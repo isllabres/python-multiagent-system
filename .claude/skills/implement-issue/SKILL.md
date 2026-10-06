@@ -37,8 +37,8 @@ Purely local. No command in this flow writes to the remote repository until Step
 
 The wiki is the map the other roles read before the code (`project-wiki`). Look up the modules the
 issue touches (its technical notes, or `git grep` for the names it uses). If the wiki has no entries
-for them, `manager` has `wiki-generator` survey that area now, so that `tester`, `developer` and
-`validator` can go straight to the right symbols instead of reading the code wholesale.
+for them, `manager` has `wiki-generator` survey that area now, so that `tester` and `developer` can
+go straight to the right symbols instead of reading the code wholesale.
 
 ## Step 4 — Per criterion: red, green and converge
 
@@ -62,26 +62,23 @@ included, `manager` calls `wiki-generator` with its hash (see Step 6).
    instructions.
 6. No blocking findings → next criterion.
 
-## Step 5 — Whole change: `tester`, then `validator`
+## Step 5 — Whole change: the suite, then the Python (`tester`)
 
 With every criterion converged individually, `tester` runs the whole suite — `pytest` and the evals
 — and the test-integrity check over the branch, because a criterion that passed in isolation can
-break when combined with another. Only with the suite green does `validator` validate the whole
-change as Python — semantics and structure against `python-standards`, plus `ruff` and `mypy` —
-because a diff that passes every test can still be badly structured. It runs second so that it
-reviews code that will not move because of a failing test.
+break when combined with another. Only with the suite green does it validate the whole change as
+Python — semantics and structure against `python-standards`, plus `ruff` and `mypy`, with The
+Python Wiki as a reference — because a diff that passes every test can still be badly structured,
+and code reviewed second will not move because of a failing test.
 
 **If anything fails:**
 
-`tester` or `validator` reports it to `manager` with literal evidence and without proposing the
-fix. `manager` records the round and hands it to the owner of the code: `developer` for production
-code, `tester` for tests, evals and fixtures. A fix that touches code goes back through `tester`
-(suite and integrity) before it is closed — it is never skipped for looking trivial. Every round
-is recorded on the same per-criterion counter as Step 4: accumulated, not reset.
-
-After a Python fix `tester` re-runs the suite and `validator` re-validates the files it touched.
-Every fix commit gets its `wiki-generator` call like any other. Repeat until everything passes or
-the cap is exhausted.
+`tester` reports it to `manager` with literal evidence and without writing the fix. `manager`
+records the round and hands it to `developer`; a finding in the tests `tester` fixes itself. After
+any fix — never skipped for looking trivial — `tester` re-runs the suite and the integrity check and
+re-validates the files it touched. Every round is recorded on the same per-criterion counter as
+Step 4: accumulated, not reset. Every fix commit gets its `wiki-generator` call like any other.
+Repeat until everything passes or the cap is exhausted.
 
 ## Step 6 — Wiki check
 
@@ -105,9 +102,9 @@ uv run mypy <touched paths>        # advisory: report it, do not silence it
 uv run pytest -q
 ```
 
-All green, mypy reported. PR body assembled from `tester`'s and `validator`'s reports (results per
-criterion, the round history, Python findings and their disposition), the changelog lines added
-and the wiki pages touched:
+All green, mypy reported. PR body assembled from `tester`'s report (results per criterion, the
+round history, Python findings and their disposition), the changelog lines added and the wiki pages
+touched:
 
 ```markdown
 ## Summary
@@ -116,7 +113,7 @@ and the wiki pages touched:
 - Tests / Evals: <result for each criterion>
 ## Review
 - Per criterion: <rounds, who, what was fixed>
-- Whole change: <tester/validator ↔ developer conversation, if there was one>
+- Whole change: <tester ↔ developer conversation, if there was one>
 ## Wiki
 - Changelog: <n> lines, one per commit
 - Pages touched: <list, or none>
@@ -146,6 +143,6 @@ Report the URL. **It does not merge, does not approve, does not close the issue.
 4. **The evidence is honest**, uncomfortable findings included.
 5. **Red before green is in the history**: for every criterion, `tester`'s `red(...)` commit comes
    before `developer`'s `green(...)` one, and no `green(...)` commit touches a test.
-6. `tester` and `validator` diagnose, never implement. `developer` writes production code and does
-   not decide what is blocking in its own code. `manager` owns the spec and coordinates, calling
+6. `tester` writes tests and diagnoses, never implements. `developer` writes production code and
+   does not decide what is blocking in its own code. `manager` owns the spec and coordinates, calling
    `wiki-generator` after every commit; it does not review code.

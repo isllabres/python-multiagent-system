@@ -1,6 +1,6 @@
 ---
 name: python-wiki-graph
-description: Builds and queries a graph of The Python Wiki (wiki.python.org, an archive) so the validator can survey its sections, choose the pages that bear on the code under review, and read them in depth. Runs on the validator's first call as a one-off bounded crawl, cached for months. Use it to back a Python finding with a documented page, never to decide the finding.
+description: Builds and queries a graph of The Python Wiki (wiki.python.org, an archive) so the tester can survey its sections, choose the pages that bear on the code under review, and read them in depth. Runs when the tester first validates a whole change, as a one-off bounded crawl cached for months. Use it to back a Python finding with a documented page, never to decide the finding.
 ---
 
 A map of a **historical** wiki, so you can find what it says about the code in front of you.

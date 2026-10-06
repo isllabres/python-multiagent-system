@@ -2,7 +2,7 @@
 
 A multi-agent system for Python development, for [Claude Code](https://claude.com/claude-code). It
 installs as a layer on top of a new or existing project and turns a GitHub issue into a pull
-request through five specialised roles. Each role has one job, so the one that writes the test is
+request through four specialised roles. Each role has one job, so the one that writes the test is
 never the one that writes the code.
 
 ```
@@ -77,8 +77,9 @@ pull requests.
   `@path`, resolved relative to the file that mentions it.
 - **The wiki starts empty.** `wiki-generator` creates `wiki/` on its first call, and `check_wiki.py`
   reports missing pages until then.
-- **The first `validator` run needs the network.** It crawls The Python Wiki once (about a minute, at
-  most 80 requests) and caches it for 180 days in `.claude/cache/`, which git-ignores itself.
+- **The first whole-change check needs the network.** `tester` crawls The Python Wiki once (about a
+  minute, at most 80 requests) and caches it for 180 days in `.claude/cache/`, which git-ignores
+  itself.
 - **Your layout is respected.** The layer never creates `src/` or `tests/`; it creates only its own
   output: `specs/`, `evals/` and `wiki/`.
 
@@ -95,7 +96,7 @@ Inside the session, three commands take you from an idea to a pull request:
 After you confirm, it pushes the branch and opens the PR on your remote. You review it on GitHub;
 merging is accepting the result. The whole flow is described under *How a change flows*.
 
-## The five roles
+## The four roles
 
 An **agent** (`.claude/agents/`) is an identity: its own prompt, model, tools and context. Each one
 below owns one thing and never does the others'.
@@ -103,13 +104,12 @@ below owns one thing and never does the others'.
 | Role | Model | Owns | Never |
 |---|---|---|---|
 | `manager` | opus | The spec and the session: interrogates until the idea converges, writes the issue, runs the other roles, keeps the round tally, confirms the red test matches the criterion, decides disputes over a test or the spec | Reviews the code `developer` writes, or writes or runs code, tests or evals |
-| `tester` | sonnet | The tests and evals: writes each criterion's red check from the spec and proves it fails for the right reason, checks the green, guards against tests bent to pass, runs the whole suite | Edits production code |
+| `tester` | opus | The tests and the verdict: writes each criterion's red check from the spec and proves it fails for the right reason, checks the green, guards against tests bent to pass, runs the whole suite, then judges the whole change as Python (semantics, structure, ruff, mypy) with The Python Wiki as a reference | Edits production code |
 | `developer` | sonnet | The implementation: makes the red green with the minimum idiomatic, typed Python, one criterion at a time | Writes, edits, skips or deletes a test |
-| `validator` | opus | Python quality of the whole change (semantics, structure, ruff, mypy), with The Python Wiki as a reference, and the feedback to the owner of the code | Runs the suite, writes code (it is read-only) |
 | `wiki-generator` | sonnet | The project wiki: one changelog line per commit and an entry when behaviour or architecture changed; surveys areas the wiki does not cover yet | Touches `README.md`, `CLAUDE.md` or `wiki/raw/` |
 
-Only `manager` delegates to the other roles. `tester` and `validator` report back to it, and it hands
-each finding to whoever owns the code and keeps the count.
+Only `manager` delegates to the other roles. `tester` reports back to it, and it hands each finding
+in production code to `developer` and keeps the count.
 
 ## How a change flows
 
@@ -130,8 +130,8 @@ created.**
 - **Step 3.** If the wiki has no entries for the area the issue touches, `wiki-generator` surveys it.
 - **Step 4, per criterion.** `tester` writes the red check, `manager` confirms it matches the
   criterion, `developer` makes it green, `tester` checks the result.
-- **Step 5, whole change.** `tester` runs the full suite and the evals, then `validator` reviews the
-  diff as Python. Findings go back to `developer` (or to `tester`, for tests).
+- **Step 5, whole change.** `tester` runs the full suite and the evals, then reviews the diff as
+  Python. Findings go back to `developer`; `tester` fixes its own tests.
 - **Step 6.** Check the wiki: every commit has its changelog line and no anchor points at missing code.
 - **Step 7.** Run `ruff`, `mypy` and `pytest`, assemble the local PR, and **show it to you**: diff,
   commits, evidence, wiki.
@@ -152,8 +152,8 @@ You review the PR on GitHub. Merging is accepting the result.
 
 ```
 per criterion:  tester (red) → manager (matches the criterion?) → developer (green) ↔ tester
-whole change:   tester (suite), then validator (Python) ↔ developer, or tester for tests
-                a fix that touches code goes back through tester
+whole change:   tester (suite, then Python) ↔ developer; tester fixes its own tests
+                every fix goes back through the suite
 ```
 
 `manager` keeps one tally per criterion across **both** loops, so a fix that moves from one loop to
@@ -242,17 +242,17 @@ not an identity: the skill orchestrates, the agent executes.
 | `/update-issue` | Applies a requested change to an existing issue |
 | `define-tests` | The TDD spec: behaviours, cases, doubles, red-green-refactor sequence (used by `manager`) |
 | `define-evals` | The EDD spec: cases judged against a bar, for performance, output quality or non-deterministic behaviour (used by `manager`) |
-| `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling. `developer` and `tester` write against it, `validator` checks against it |
+| `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling. `developer` and `tester` write against it, and `tester` checks the whole change against it |
 | `commit-messages` | The `red`, `green` and `wiki` commit conventions, shared by `tester`, `developer` and `wiki-generator` |
 | `project-wiki` | How every role reads the wiki as a code map, the entry format, and the checker |
-| `python-wiki-graph` | On the validator's first call, builds a cached graph of The Python Wiki (an archive) so it can pick the pages that bear on the code it is validating. One bounded crawl, polite to the site |
+| `python-wiki-graph` | On the tester's first whole-change check, builds a cached graph of The Python Wiki (an archive) so it can pick the pages that bear on the code it is validating. One bounded crawl, polite to the site |
 
 ## What you will find in the repository
 
 ```
 CLAUDE.md                 The contract. The only document that has to be read in full.
 .claude/
-  agents/*.md             The five roles.
+  agents/*.md             The four roles.
   skills/*/SKILL.md       The eleven skills, with the scripts and tests that go with them.
 specs/                    The executable shadow of each issue.
 evals/                    The cases an eval is judged over.
