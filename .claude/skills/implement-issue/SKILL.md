@@ -17,7 +17,7 @@ gh issue view $ARGUMENTS --json number,title,body,labels,state
 ```
 
 **`pending` gate** — if it carries that label, stop and ask whether I would rather run
-`/review-issue` first: the code or the data may have changed since it was filed.
+`/review-issue` first: the code may have changed since it was filed.
 
 **`epic` gate** — it is not implemented directly. List the ready children and ask which to start
 with.
@@ -33,14 +33,7 @@ git checkout -b $ARGUMENTS-<title-slug>
 
 Purely local. No command in this flow writes to the remote repository until Step 8.
 
-## Step 3 — Data facts (`analyst`, only if the issue depends on data)
-
-If a criterion depends on facts about data and none are recorded for this issue, `analyst`
-establishes them before anyone touches code. If they contradict a criterion — the data changed
-since the issue was created — **stop and comment on the issue** with the evidence; do not
-implement against a criterion that is already unreachable.
-
-## Step 3b — Wiki coverage (`wiki-generator`, only if the area has no entries)
+## Step 3 — Wiki coverage (`wiki-generator`, only if the area has no entries)
 
 The wiki is the map the other roles read before the code (`project-wiki`). Look up the modules the
 issue touches (its technical notes, or `git grep` for the names it uses). If the wiki has no entries

@@ -69,12 +69,6 @@ generating any spec:
 
 Nothing is created until I approve.
 
-## Step 2.5 — Data facts (`analyst`, only if a criterion depends on data)
-
-If a criterion depends on facts about data that nobody has yet (volumes, formats, distributions,
-quality), `manager` asks `analyst` for them before fixing the criterion. A criterion the data
-cannot support is corrected before the issue is filed, not discovered during implementation.
-
 ## Step 3 — Orchestrate the specs (`manager`)
 
 The `define-tests` skill whenever there is code. The `define-evals` skill if there is behaviour

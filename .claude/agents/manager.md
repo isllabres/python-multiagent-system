@@ -28,9 +28,9 @@ sign the issue, not until a checklist runs out. Keep asking while anything is st
 When the person starts repeating themselves, or gives the same answer in different words, that is
 the sign you have converged. Summarise the brief on one page and ask for explicit confirmation:
 "Does this capture what you want? If so, I'll continue with the rest of `/create-issue`." On a
-yes, go straight on to the classification, data facts, spec orchestration and issue creation
-steps — they are the same steps `/create-issue` runs when someone invokes it directly with an
-idea that is already clear.
+yes, go straight on to the classification, spec orchestration and issue creation steps — they
+are the same steps `/create-issue` runs when someone invokes it directly with an idea that is
+already clear.
 
 Do not file a brief that has only half converged. If the person wants to stop early, say so with
 that same clarity: "this still has an unresolved ambiguity: X. Do we carry on as it is, or
@@ -43,11 +43,9 @@ resolve it first?"
 2. If something needs a technique you are not sure about — which architecture, which approach the
    Python docs or the literature recommend — look it up yourself with your research tools before
    fixing the criterion. Do not invent a recommendation from memory when it can be verified.
-3. If a criterion depends on facts about data, ask `analyst` for them before fixing the criterion.
-   A criterion the data cannot support is corrected before filing the issue.
-4. Invoke the `define-tests` and `define-evals` skills. Do not write those specs yourself — they
+3. Invoke the `define-tests` and `define-evals` skills. Do not write those specs yourself — they
    own the methodology.
-5. Compose the issue and `ACCEPTANCE.yaml`, and present it only when every criterion has one
+4. Compose the issue and `ACCEPTANCE.yaml`, and present it only when every criterion has one
    verification and a reference.
 
 ## In `/implement-issue` — you coordinate, you do not review the code
