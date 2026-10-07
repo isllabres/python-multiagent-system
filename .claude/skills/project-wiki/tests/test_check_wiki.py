@@ -149,55 +149,14 @@ def test_a_mention_in_a_comment_is_not_a_definition(project: Path) -> None:
     assert "not defined there" in run(project)[1]
 
 
-def git(project: Path, *args: str) -> str:
-    done = subprocess.run(
-        ["git", "-C", str(project), *args], capture_output=True, text=True, check=True
+def test_a_link_to_a_living_spec_must_resolve(project: Path) -> None:
+    page = project / "wiki" / "3.-Features-and-Behaviour.md"
+    page.write_text(
+        "# Features\n\n### HTTP client\nRetries server errors.\n"
+        "See: [http-client](../openspec/specs/http-client/spec.md)\n"
     )
-    return done.stdout.strip()
-
-
-@pytest.fixture
-def repo(project: Path) -> Path:
-    git(project, "init", "-q", "-b", "main")
-    git(project, "config", "user.email", "t@t")
-    git(project, "config", "user.name", "t")
-    git(project, "add", ".")
-    git(project, "commit", "-qm", "base")
-    git(project, "checkout", "-q", "-b", "5-x")
-    return project
-
-
-def commit(repo: Path, name: str, subject: str) -> str:
-    (repo / name).write_text(subject)
-    git(repo, "add", name)
-    git(repo, "commit", "-qm", subject)
-    return git(repo, "rev-parse", "--short", "HEAD")
-
-
-def test_changelog_reports_commits_without_a_line(repo: Path) -> None:
-    red = commit(repo, "r.txt", "red(#5-AC1): reject empty ids")
-    green = commit(repo, "g.txt", "green(#5-AC1): reject empty ids in load")
-    commit(repo, "w.txt", f"wiki(#5-AC1): log {red}")
-    log = repo / "wiki" / "log.md"
-    log.write_text(
-        f"# Changelog\n- 2026-10-01 · {red} · red(#5-AC1): reject empty ids\n"
-    )
-    code, out = run(repo, "--base", "main")
-    assert code == 1
-    assert f"no line for commit {green}" in out
-    assert f"no line for commit {red}" not in out
-    assert "wiki(" not in out
-    log.write_text(
-        log.read_text() + f"- 2026-10-01 · {green} · green(#5-AC1): reject empty ids\n"
-    )
-    assert run(repo, "--base", "main") == (0, "wiki ok\n")
-
-
-def test_changelog_check_is_off_without_base(repo: Path) -> None:
-    commit(repo, "r.txt", "red(#5-AC1): reject empty ids")
-    assert run(repo) == (0, "wiki ok\n")
-
-
-def test_unknown_base_is_reported_not_crashed(repo: Path) -> None:
-    code, out = run(repo, "--base", "nope")
-    assert code == 1 and "cannot read git history nope..HEAD" in out
+    assert "broken link to ../openspec/specs/http-client/spec.md" in run(project)[1]
+    living = project / "openspec" / "specs" / "http-client"
+    living.mkdir(parents=True)
+    (living / "spec.md").write_text("# http-client Specification\n")
+    assert run(project) == (0, "wiki ok\n")

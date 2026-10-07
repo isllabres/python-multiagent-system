@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """Check that the project wiki is brief, connected and still points at real code.
 
-    python3 .claude/skills/project-wiki/scripts/check_wiki.py [--wiki wiki] [--root .] [--base main]
+    python3 .claude/skills/project-wiki/scripts/check_wiki.py [--wiki wiki] [--root .]
 
 Checks, each reported as one line; exit status 1 if there is any:
   structure   Home, _Sidebar, log and the six pages exist; the sidebar links all six
   size        pages at most 100 lines, changelog lines at most 100 characters,
               decisions and known issues at most 5 lines under their heading
-  links       every relative link to a .md page resolves
+  links       every relative link to a .md file resolves, a living spec included
   anchors     every `path.py` or `path.py:symbol` in a page names a file that exists and,
               if given, a def, class or assignment that is still in it
-  changelog   (with --base) every commit of base..HEAD except wiki(...) ones has its hash
-              in log.md
 """
 
 from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -115,38 +112,15 @@ def check_anchors(wiki: Path, root: Path) -> list[str]:
     return problems
 
 
-def check_changelog(wiki: Path, root: Path, base: str) -> list[str]:
-    log = wiki / "log.md"
-    if not log.is_file():
-        return []
-    git = ["git", "-C", str(root), "log", "--reverse", "--format=%h", "--invert-grep"]
-    done = subprocess.run(
-        [*git, "--grep=^wiki(", f"{base}..HEAD"], capture_output=True, text=True
-    )
-    if done.returncode != 0:
-        return [
-            f"changelog: cannot read git history {base}..HEAD: {done.stderr.strip()}"
-        ]
-    text = log.read_text()
-    return [
-        f"changelog: no line for commit {sha}"
-        for sha in done.stdout.split()
-        if sha not in text
-    ]
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--wiki", type=Path, default=Path("wiki"))
     parser.add_argument("--root", type=Path, default=Path("."))
-    parser.add_argument("--base", help="default branch; enables the changelog check")
     args = parser.parse_args(argv)
 
     problems = check_structure(args.wiki)
     problems += check_sizes(args.wiki) + check_links(args.wiki)
     problems += check_anchors(args.wiki, args.root)
-    if args.base:
-        problems += check_changelog(args.wiki, args.root, args.base)
     for problem in problems:
         print(problem)
     print(f"wiki: {len(problems)} problem(s)" if problems else "wiki ok")
