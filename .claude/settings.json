@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/skills/sdd/scripts/sdd.py --root \"$CLAUDE_PROJECT_DIR\" status --brief"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/skills/sdd/scripts/sdd.py --root \"$CLAUDE_PROJECT_DIR\" stop-gate",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python3 .claude/skills/sdd/scripts/sdd.py *)",
+      "Bash(python3 .claude/skills/project-wiki/scripts/check_wiki.py)",
+      "Bash(python3 .claude/skills/project-wiki/scripts/check_wiki.py *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(uv run mypy *)",
+      "Bash(openspec validate *)",
+      "Bash(openspec list *)",
+      "Bash(openspec show *)",
+      "Bash(openspec status *)",
+      "Bash(openspec instructions *)"
+    ]
+  }
+}
