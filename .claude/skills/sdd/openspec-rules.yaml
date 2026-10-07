@@ -1,0 +1,22 @@
+# python-multiagent-system rules: added by sdd.py init. They reach every artifact through
+# openspec instructions; the sdd skill explains them and sdd.py check enforces them.
+rules:
+  proposal:
+    - "Add an Out of scope section listing what this change deliberately leaves out."
+  specs:
+    - "One observable behaviour per requirement, stated with a single SHALL or MUST. Never write should or may in a requirement."
+    - "Every scenario is binary and uses concrete values, written as - **WHEN** ... and - **THEN** ..., with - **GIVEN** ... when it needs a precondition."
+  design:
+    - "Always write design.md, even for a small change."
+    - "Add a Files section (## Files) listing every file the change touches, one per line, as - `path` — modify or - `path` — new."
+    - "Under Decisions, name at least one alternative you discarded and why."
+  tasks:
+    - "One group per requirement, headed ## N. Requirement: <exact requirement name>. A REMOVED requirement gets a group with a [remove] task."
+    - "Start every task with its kind: [test], [guard], [code] or [remove]."
+    - "In each group, one [test] task per scenario, before any [code] task, written as - [ ] N.k [test] `tests/<file>.py::<test_name>` — Scenario: <exact scenario name>."
+    - "A [guard] task names a test that already passes and must keep passing: use it for behaviour a refactor must preserve."
+operations:
+  apply:
+    guidance:
+      - "Red before green: run each [test] task's test, see it fail because the behaviour is missing, commit it, and only then write the [code] task."
+      - "A code commit never touches a test."
