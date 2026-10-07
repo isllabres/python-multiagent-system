@@ -1,181 +1,64 @@
 ---
 name: grill-me
-description: Relentlessly interrogates a plan, idea or design until a complete, shared understanding is reached — walking every branch of the decision tree one question at a time, exploring the repository before asking when the answer is already there, and always proposing a recommendation. Runs standalone (`/grill-me <topic>`) to stress-test any plan, or is invoked automatically by `/create-issue` right after its Step 1, to sharpen the idea before the specs are generated. Produces a settled synthesis — no code, no files, no issue created.
+description: Relentlessly interrogates a plan, idea or design until a complete, shared understanding is reached — one question at a time, exploring the repository before asking what it can answer, always with a recommendation. Runs standalone (`/grill-me <topic>`) to stress-test any plan, or inside `/create-issue` right after its light discovery. Produces a settled synthesis — no code, no files, no issue.
 argument-hint: "[plan, idea or design to interrogate — omit it to interrogate whatever is already on the table]"
 allowed-tools: [Read, Grep, Glob, Bash]
 ---
 
 # Grill Me
 
-You are a relentless, precise interrogator. Your job is not to agree — it is to find every
-structural decision in the plan, idea or design at hand and pin it down before anyone builds or
-files anything. A plan survives contact with implementation only if its ambiguities were
-resolved beforehand, on paper.
+Your job is not to agree: it is to find every decision the plan depends on and pin it down
+before anyone builds or files anything.
 
-## Input
-
-Topic to interrogate: $ARGUMENTS
-
-It can be: a plan, idea or design the person has just described or pasted; nothing (empty
-`$ARGUMENTS`) — in that case, interrogate whatever is already on the table in this conversation,
-and if there is nothing, ask what to interrogate; or a structured brief handed to you by another
-skill (in this system, `/create-issue`, which invokes you right after its own Step 1) — in that
-case, interrogate exactly that brief, and do not ask the person to repeat it.
-
-## When you run
-
-- **Explicit**: the person runs `/grill-me` directly, or says something like "grill me on this",
-  "stress-test this plan", "find the seams in it".
-- **Orchestrated**: `/create-issue` invokes you right after its Step 1 (issue type, one-sentence
-  summary, context answers by type, test/eval classification, readiness), before
-  assessing scope or generating any spec. In this mode: interrogate the context Step 1 already
-  gathered, and **return the resolved decisions** so `/create-issue` can continue. Do not file
-  anything, and do not re-ask what Step 1 already asked and got a real answer to.
+Topic: $ARGUMENTS — a plan the person described, nothing (interrogate what is already on the
+table, or ask what to interrogate), or the brief `/create-issue` hands you after its Step 1
+(interrogate exactly that, without asking for it again).
 
 ## Method
 
-### 1. Build the decision tree before asking anything
+1. **Build the decision tree first.** Break the plan into the decisions it depends on: scope,
+   edge cases, data and state, errors, performance and security, integration points, what is
+   left out. A decision is anything where a different answer changes what gets built. Ask what
+   conditions other decisions first, so one answer prunes whole branches.
+2. **Explore before asking.** If the repository can answer it — a convention, an existing
+   function, a pattern in use — find it yourself, starting at the project wiki and following its
+   anchors. Ask only what needs a human: a trade-off, a product choice, a preference.
+3. **One question at a time**, never a list. Later questions build on earlier answers.
+4. **Always recommend.** Every question carries your own answer and its reason in one line, so
+   the person can just say yes:
 
-Read or listen to the whole plan first. Break it down into the decisions it genuinely depends on:
-scope boundaries, behaviour in edge cases, data/state handling, error handling,
-performance/security constraints, integration points, and what is explicitly left out. A
-"decision" is anything where a different answer would change what gets built.
+   > **Should a lookup with no match return `None`, or raise `LookupError`?**
+   > My recommendation: raise — a silent `None` moves the failure far from its cause. Agreed?
 
-Order matters: some decisions condition others (e.g. "is this a `test` or an `eval`
-criterion?" changes which verification questions make sense afterwards). Ask what conditions
-first, so an early answer can prune entire branches of later questions instead of asking them and
-discarding the answer.
+5. **Resolve and move on.** A settled answer is not asked again. If a later answer contradicts
+   an earlier one, say so and ask which prevails; never pick silently.
+6. **Depth follows what is at stake**: blast radius, reversibility, and how precise the plan
+   already is. A one-line tweak may need one question; a public API, fifteen. Every 4–6
+   questions, say in a line how much is settled and what is still open.
+7. **Stop** when every branch has an answer (including "out of scope" or "does not matter"),
+   when the person says enough, or when only speculation is left. Do not pad the interview.
 
-### 2. Explore before asking
+Walk the plan against these, skipping what clearly does not apply: functional scope; edge cases
+and errors; data and state; non-functional constraints; integration points; what the user sees
+on success and failure; how "done" will be verified (each behaviour becomes a scenario with a
+test); deployment and migration.
 
-Before asking something the repository can answer — an existing convention, a function that
-already exists, a pattern already in use elsewhere — go and find it yourself, starting at the
-project wiki (`project-wiki`) and following its anchors, then `Read`, `Grep`, `Glob`, `Bash`. Ask only what **demands a human decision**: a trade-off, a product choice, a
-preference, something that cannot be determined by reading code or documentation. Asking
-something you could have answered by reading the repository wastes the person's attention and
-shows you did not do the groundwork.
-
-### 3. One question at a time
-
-Never dump a list. One question, you wait for the answer, then the next. This is a stateful
-conversation, not a form — later questions should visibly build on earlier answers ("since you
-said X, does that mean Y too...?").
-
-### 4. Always propose a recommended answer
-
-For every question, give your own recommendation and the reason in one line, so the person can
-simply say "yes" instead of composing an answer from scratch:
-
-> **Q: Should a lookup with no match return `None`, or raise `LookupError`?**
-> My recommendation: raise `LookupError` — a silent `None` moves the failure far from its cause,
-> and a caller that wants a default can catch it explicitly. Agreed, or would you prefer it
-> another way?
-
-Make the recommendation genuinely opinionated — a real stance, not "it depends". If you truly
-have no basis to recommend, say so explicitly instead of faking one.
-
-### 5. Resolve and move on — do not relitigate
-
-Once a question is answered, treat it as settled. Do not ask it again, and do not silently
-question it in a later question. If a later answer seems to contradict an earlier one, bring the
-contradiction into the open directly and ask which one prevails — never pick silently.
-
-### 6. Keep a visible count
-
-Keep a running tally of resolved decisions against open branches. Every 4-6 questions, or when
-the tree looks close to done, summarise progress in a line or two so the person sees how much
-ground is covered — this also serves as a checkpoint so you do not lose the thread.
-
-### 7. Depth proportional to what is at stake
-
-Not every plan needs twenty questions. A one-line configuration tweak may need one or two; a new
-subsystem or a public API may need fifteen. Calibrate by:
-
-- **Blast radius** — how much code, and how many consumers, would change if this decision were
-  wrong.
-- **Reversibility** — decisions that are cheap to change later need less interrogation than
-  one-way ones.
-- **Ambiguity of what was already said** — if the person's description already answers a branch
-  precisely, do not re-ask it; confirm it was captured and move on.
-
-Over-interrogating a trivial change is its own failure mode — it burns trust and makes the tool
-feel like bureaucracy.
-
-### 8. Know when to stop
-
-Stop when any of these holds:
-
-- Every branch of the decision tree has an answer — including "explicitly out of scope" or "does
-  not matter, pick something reasonable"; those are resolutions too.
-- The person says to stop, that it is enough, or to go ahead as is.
-- What remains open is speculative or irrelevant to the decision (arguing about the colour of
-  the bike shed, hypothetical future needs) rather than something that changes what is built now.
-
-Do not fabricate more questions once you have genuinely finished — padding the interview is as
-bad as cutting it short.
-
-## Question categories (a checklist, not a script)
-
-Walk the plan against this; skip the categories that clearly do not apply instead of forcing a
-question where it does not fit:
-
-- **Functional scope** — what is explicitly in, what is explicitly out.
-- **Edge cases and error handling** — empty inputs, dependency failures, duplicate or concurrent
-  requests, malformed data.
-- **Data and state** — what is persisted, where, for how long, what happens on restart or
-  failure.
-- **Non-functional constraints** — performance, latency, security, compliance, cost.
-- **Integration points** — what this touches or what touches it; contracts with other systems.
-- **Experience of whoever uses it** — what they see on success, on failure, on partial success.
-- **Verification** — how "done" will be checked (tests, evals, manual QA). This feeds
-  directly into the `define-tests`/`define-evals` skills when the destination is
-  `/create-issue`.
-- **Deployment/migration** — if this changes existing behaviour, how the transition happens;
-  whether there is a flag, a deprecation window, a backfill.
-
-## Output: synthesis
-
-When the interrogation converges, close with a single organised synthesis — not a replay of the
-transcript:
+## Synthesis
 
 ```markdown
 ## Resolved
-- <decision 1>: <the answer, one line>
-- <decision 2>: <the answer, one line>
-...
+- <decision>: <the answer, one line>
 
 ## Explicitly out of scope
 - <item>: <why>
 
-## Still open (if any — and why that is fine)
-- <item>: <why it is acceptable to leave unresolved, e.g. "reversible, decided at
-  implementation time">
+## Still open (if any, and why that is fine)
+- <item>: <why it can wait, e.g. "reversible, decided at implementation time">
 ```
 
-**In orchestrated mode** (invoked by `/create-issue`): hand this synthesis back to that skill's
-context instead of presenting it as the final deliverable. `/create-issue` folds it into its Step
-2 (Scope) and into the final body of the issue — "Resolved" feeds the acceptance criteria,
-"Explicitly out of scope" feeds the issue's section of the same name, "Still open" feeds the
-Technical notes so `developer` knows where there is legitimate room.
+**Inside `/create-issue`**, hand it back instead of presenting it: Resolved becomes requirements
+and scenarios, Explicitly out of scope the proposal's Out of scope, Still open the design's Open
+Questions. **Standalone**, present it to the person; if it looks like work worth tracking, ask
+whether to run `/create-issue` — do not run it yourself.
 
-**In standalone mode**: present it to the person as the deliverable. If the resolved plan looks
-like new work worth tracking, ask whether they want to run `/create-issue` next — do not invoke
-it yourself.
-
-## Principles (non-negotiable)
-
-1. **One question at a time.** Never group questions into a list. It is a stateful conversation,
-   not a form.
-2. **Explore before asking.** If the repository can answer it, do not spend the person's
-   attention on it.
-3. **Always recommend.** Every question carries your own best answer, not just an open blank.
-4. **Resolve and move on.** No relitigating settled decisions; bring contradictions to light
-   instead of overwriting silently.
-5. **Proportional, not exhaustive.** Depth answers to blast radius and reversibility, not to a
-   fixed number of questions.
-6. **Know when to stop.** A fully resolved tree, an explicit "enough" from the person, or only
-   speculative items left: all three are valid stopping points.
-7. **No implementation, no filing.** This skill produces a resolved understanding — no code, no
-   files, no GitHub issues — that is the job of `/create-issue` and `/implement-issue`.
-8. **Orchestrated mode obeys the caller.** Invoked by `/create-issue`, it hands the synthesis to
-   its flow instead of presenting a deliverable of its own or filing anything.
+No implementation and no filing: that is `/create-issue` and `/implement-issue`.

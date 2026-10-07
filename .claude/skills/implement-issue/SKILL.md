@@ -1,12 +1,13 @@
 ---
 name: implement-issue
-description: Launches the full multi-agent cycle over an issue — per criterion, then the whole change, with the wiki updated after every commit — and assembles a local PR. Does not touch GitHub until you confirm.
+description: Implements an issue's OpenSpec change on the branch <n>-<change-id> — checks the issue still applies, mirrors it, has the implementer build it test-first and the reviewer judge it, updates the wiki once, and assembles a local PR. Resumes where it stopped. Does not touch GitHub until you confirm.
 argument-hint: "<issue number>"
 ---
 
-`manager`, the main agent, coordinates this whole sequence: it delegates to the other roles, hands
-findings to whoever owns the code, and keeps the round tally. It does not review the code. Nothing
-is pushed or opened on GitHub until Step 8, and only with your explicit confirmation.
+`manager`, the main agent, runs this sequence: it delegates, passes paths rather than content,
+keeps the round tally and never reviews the code. Nothing is pushed or opened on GitHub until
+Step 7, and only with your explicit confirmation. `sdd` has the rules; `sdd.py` below is
+`python3 .claude/skills/sdd/scripts/sdd.py`.
 
 Detect the repository with `gh repo view`. If `gh auth status` fails, stop.
 
@@ -16,133 +17,109 @@ Detect the repository with `gh repo view`. If `gh auth status` fails, stop.
 gh issue view $ARGUMENTS --json number,title,body,labels,state
 ```
 
-**`pending` gate** — if it carries that label, stop and ask whether I would rather run
-`/review-issue` first: the code may have changed since it was filed.
+- **`epic`**: it is not implemented directly. List the ready children and ask which to start.
+- **`pending`**: it was filed for later; ask whether to start it now.
+- **No `openspec:change` marker**: it predates this flow. Convert it with `/update-issue` first.
 
-**`epic` gate** — it is not implemented directly. List the ready children and ask which to start
-with.
+## Step 2 — Does it still apply?
 
-## Step 2 — Local branch, without touching GitHub
+On a fresh start (no branch yet), run `sdd.py stale $ARGUMENTS`. It validates the change against
+today's living specs, checks that the files `design.md` modifies still exist, and that no
+living spec it touches changed since the issue was written. If it reports anything, **stop**
+and propose `/update-issue` with the evidence. A behaviour that already exists is caught later,
+by a test that passes before any code.
 
-```bash
-default_branch=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null \
-  || git symbolic-ref --short refs/remotes/origin/HEAD | sed 's@^origin/@@')
-git checkout "$default_branch" && git pull origin "$default_branch"
-git checkout -b $ARGUMENTS-<title-slug>
-```
-
-Purely local. No command in this flow writes to the remote repository until Step 8.
-
-## Step 3 — Wiki coverage (`wiki-generator`, only if the area has no entries)
-
-The wiki is the map the other roles read before the code (`project-wiki`). Look up the modules the
-issue touches (its technical notes, or `git grep` for the names it uses). If the wiki has no entries
-for them, `manager` has `wiki-generator` survey that area now, so that `tester` and `developer` can
-go straight to the right symbols instead of reading the code wholesale.
-
-## Step 4 — Per criterion: red, green and converge
-
-For each criterion in `ACCEPTANCE.yaml`, in order. After **every** commit below, fix commits
-included, `manager` calls `wiki-generator` with its hash (see Step 6).
-
-1. `tester` writes the test or eval from the spec, watches it fail for the right reason, and
-   commits `red(#$ARGUMENTS-<AC>):`.
-2. `manager` checks that the red test is the right check for the criterion — its statement, its
-   verification, its bar. If not, it goes back to `tester` and the round is recorded.
-3. `developer` writes the minimum that turns it green and commits `green(#$ARGUMENTS-<AC>):`. It
-   never touches the test.
-4. `tester` checks the green: runs it and everything before it, checks that the tests are intact,
-   that nothing hardcodes the test's inputs, and that the diff does no more than the criterion asks.
-   `manager` does not review the code.
-5. If `tester` has a blocking finding, `manager` records the round — criterion, the finding — and
-   hands it to `developer`, who fixes it (a test it thinks is wrong goes to `manager`, who decides
-   between `tester` fixing the test and the spec changing) and goes back to step 4. Rounds are
-   counted per criterion, shared with the whole-change loop in Step 5. If this would be the 4th
-   round, **stop**, comment the blockage on the issue with the full history, and wait for
-   instructions.
-6. No blocking findings → next criterion.
-
-## Step 5 — Whole change: the suite, then the Python (`tester`)
-
-With every criterion converged individually, `tester` runs the whole suite — `pytest` and the evals
-— and the test-integrity check over the branch, because a criterion that passed in isolation can
-break when combined with another. Only with the suite green does it validate the whole change as
-Python — semantics and structure against `python-standards`, plus `ruff` and `mypy`, with The
-Python Wiki as a reference — because a diff that passes every test can still be badly structured,
-and code reviewed second will not move because of a failing test.
-
-**If anything fails:**
-
-`tester` reports it to `manager` with literal evidence and without writing the fix. `manager`
-records the round and hands it to `developer`; a finding in the tests `tester` fixes itself. After
-any fix — never skipped for looking trivial — `tester` re-runs the suite and the integrity check and
-re-validates the files it touched. Every round is recorded on the same per-criterion counter as
-Step 4: accumulated, not reset. Every fix commit gets its `wiki-generator` call like any other.
-Repeat until everything passes or the cap is exhausted.
-
-## Step 6 — Wiki check
-
-`wiki-generator` already ran after every commit. Verify nothing was skipped and nothing rotted:
+## Step 3 — Branch and mirror
 
 ```bash
-python3 .claude/skills/project-wiki/scripts/check_wiki.py --base <default-branch>
+branch=$(sdd.py branch $ARGUMENTS)            # <n>-<change-id>
 ```
 
-It fails if a commit of the branch has no line in `wiki/log.md`, if an anchor points at a file or
-symbol that no longer exists, if a link is broken, or if a page, a changelog line or a decision is
-over its size limit. `manager` has `wiki-generator` fix whatever it reports, and runs it again.
-`README.md` is not touched here — it is the system's front door, not the project's.
+- **New**: from the up-to-date default branch, `git switch -c "$branch"`, then
+  `sdd.py pull $ARGUMENTS` and commit `spec(#$ARGUMENTS): pull change <id>`.
+- **Resuming** (the branch exists): `git switch "$branch"` and `sdd.py diff $ARGUMENTS`. If the
+  issue changed, **stop** and show the difference: adopting it means `sdd.py pull` and possibly
+  reworking tasks already done, and that is the person's call. Then carry on from where
+  `sdd.py status` says the work stands: unticked tasks → Step 4; all ticked → Step 5;
+  `review.md` APPROVED → Step 6; `BLOCKED.md` → show its reason and ask.
 
-## Step 7 — Verify and assemble the local PR
+Purely local: nothing here writes to the remote.
 
-```bash
-uv run ruff check .
-uv run ruff format --check <touched paths>
-uv run mypy <touched paths>        # advisory: report it, do not silence it
-uv run pytest -q
-```
+## Step 4 — Implement
 
-All green, mypy reported. PR body assembled from `tester`'s report (results per criterion, the
-round history, Python findings and their disposition), the changelog lines added and the wiki pages
-touched:
+Ask `implementer` to work through `openspec/changes/<id>/tasks.md` from its first unticked task.
+It replies one line:
 
-```markdown
-## Summary
-## Changes
-## Verification
-- Tests / Evals: <result for each criterion>
-## Review
-- Per criterion: <rounds, who, what was fixed>
-- Whole change: <tester ↔ developer conversation, if there was one>
-## Wiki
-- Changelog: <n> lines, one per commit
-- Pages touched: <list, or none>
-Closes #$ARGUMENTS
-```
+- `done -> …/tasks.md` → Step 5.
+- `blocked -> …/tasks.md` → read the `BLOCKED` note. A spec problem: requirements or design
+  change through `/update-issue` (your approval); tasks alone, `manager` amends them in the issue
+  with a comment, pulls the mirror again and goes back to Step 4. An environment problem: block
+  the change (below).
 
-**Show me all of this — diff, commits, PR body, wiki pages touched — and stop.** It is the local
-PR: it exists as a branch and commits on your machine, nothing on GitHub yet.
+## Step 5 — Review, and the round tally
 
-## Step 8 — Only with my explicit confirmation
+Ask `reviewer` to review `<id>` against the default branch. It writes `review.md` and replies:
 
-```bash
-git push -u origin $ARGUMENTS-<title-slug>
-gh pr create --title "<title>" --body-file "$tmpfile"
-```
+- `APPROVED -> …/review.md` → Step 6.
+- `CHANGES_REQUESTED -> …/review.md` → count the CHANGES_REQUESTED rows in its Rounds table.
+  Up to 3, ask `implementer` to answer that round, then back to Step 5. Before a 4th, **block
+  the change**: write `openspec/changes/<id>/BLOCKED.md` with the reason and the round history,
+  commit it with `review.md` as `spec(#$ARGUMENTS): block <id>`, add the `blocked` label and
+  comment the history on the issue, and wait for instructions.
 
-Report the URL. **It does not merge, does not approve, does not close the issue.**
+## Step 6 — Wiki and the local PR
+
+1. Call `wiki-generator` with the issue, the change and the `## Wiki gaps` noted in `tasks.md`
+   and `review.md`. It replies `wiki -> <sha>`.
+2. Check:
+
+   ```bash
+   python3 .claude/skills/project-wiki/scripts/check_wiki.py
+   sdd.py check --base <default-branch> --remote
+   ```
+
+   Anything they report goes back to its owner: the wiki to `wiki-generator`, the rest to
+   `implementer` through a review round.
+3. Commit `review.md` as `spec(#$ARGUMENTS): review <id>`.
+4. **Show me the local PR and stop**: the diff against the default branch, the commits, the
+   verdict and checkpoints of `review.md` with any disagreement, the wiki pages touched, and the
+   PR body:
+
+   ```markdown
+   ## Summary
+   ## Requirements
+   - <requirement>: <its scenarios and their tests>
+   ## Review
+   - Verdict, checkpoints, rounds, disagreements (both positions)
+   ## Wiki
+   - <pages touched, or none>
+   Closes #$ARGUMENTS
+   ```
+
+## Step 7 — Only with my explicit confirmation
+
+- **Accepted**:
+
+  ```bash
+  openspec archive <id> --yes        # the living specs take the change; the change is archived
+  git add openspec && git commit -m "spec(#$ARGUMENTS): archive <id>"
+  git push -u origin "$branch"
+  gh pr create --title "<issue title>" --body-file "$tmpfile"
+  ```
+
+  Archiving inside the PR means the merge updates the code and `openspec/specs/` together, and
+  a PR closed without merging never touches the default branch. Report the PR's URL.
+- **Changes requested**: they become tasks in the issue (your request is the approval), the
+  mirror is pulled again, and the work goes back to Step 4.
+
+It never merges, approves or closes anything: merging the PR is how you accept the result, and
+GitHub closes the issue.
 
 ## Principles
 
-1. **The round cap is counted per criterion, across the per-criterion loop and the whole-change
-   one.** A fix that moves from one loop to the other does not reset the counter.
-2. **Nothing touches GitHub before Step 8.**
-3. **The wiki follows every commit**: one changelog line each, and a page edited only when
-   behaviour or architecture changed. A fix is just another commit; history is recorded, never
-   rewritten.
-4. **The evidence is honest**, uncomfortable findings included.
-5. **Red before green is in the history**: for every criterion, `tester`'s `red(...)` commit comes
-   before `developer`'s `green(...)` one, and no `green(...)` commit touches a test.
-6. `tester` writes tests and diagnoses, never implements. `developer` writes production code and
-   does not decide what is blocking in its own code. `manager` owns the spec and coordinates, calling
-   `wiki-generator` after every commit; it does not review code.
+1. **The issue is the source of truth**; the mirror only follows it, and drift stops the flow.
+2. **Red before green, in the history**: every group's `red` commit precedes its `green`, and no
+   `green` commit touches a test (`sdd.py check --base`).
+3. **Three rounds at most**, counted in `review.md`; the fourth blocks the change.
+4. **Nothing reaches GitHub before Step 7** except task-only amendments and `blocked`.
+5. **The evidence is honest**, uncomfortable findings included.

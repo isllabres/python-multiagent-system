@@ -1,129 +1,92 @@
 ---
 name: create-issue
-description: Interactive discovery and creation of an issue with the test and eval specs embedded. manager drives and writes. Never implements.
+description: Turns an idea into an approved OpenSpec change held by a GitHub issue — light discovery, /grill-me, scope, then the change's proposal, delta specs, design and tasks written and validated locally, your approval, and the issue. manager drives and writes. Never implements.
 argument-hint: "[bug | feature | refactor]"
 ---
 
-`manager` drives the discovery and writes. Nothing is implemented in this skill.
-
-Detect the repository with `gh repo view`. If `gh auth status` fails, stop: without an
-authenticated `gh` there is nothing to do.
+`manager` drives the discovery and writes. Nothing is implemented in this skill, and nothing
+reaches GitHub until you approve the change. `sdd` has the format and the rules.
 
 Type hint: $ARGUMENTS
 
-## Step 0 — Does it already come from `/grill-me`?
+## Step 0 — Preconditions
 
-If this conversation already contains a `/grill-me` synthesis (Resolved / Explicitly out of scope
-/ Still open), **do not repeat Step 1 or invoke `/grill-me` again** — it is already done. Jump
-straight to Step 2, using that synthesis as if it were Step 1's result.
+- `gh auth status` passes and `gh repo view` names the repository. Without them, stop.
+- The OpenSpec CLI is installed (`openspec --version`) and `openspec/` exists. If it does not,
+  run `python3 .claude/skills/sdd/scripts/sdd.py init`.
+- You are on the default branch; if not, ask before going on.
+- If this conversation already holds a `/grill-me` synthesis (Resolved / Explicitly out of
+  scope / Still open), skip Steps 1 and 1b and use it.
 
-If not, continue to Step 1.
+## Step 1 — Light discovery
 
-## Step 1 — Light discovery (`manager`)
+Four quick questions, without exploring the repository yet:
 
-**Group 1**: bug, feature or refactor? A one-sentence summary.
+1. Bug, feature or refactor? A one-sentence summary.
+2. By type — bug: current and expected behaviour, steps, severity; feature: the problem it
+   solves and what success looks like from outside; refactor: what it touches, why, and which
+   behaviour must not change.
+3. Is there behaviour to verify at all? A refactor that changes none has no delta specs: its
+   tasks are `[guard]` tests and the change is marked `skip_specs`.
+4. Implement it soon, or file it for later (`pending`)?
 
-**Group 2**, by type — bug: current versus expected behaviour, steps, severity; feature: what
-problem it solves, what success looks like from outside; refactor: what is touched, why, what
-behaviour must be preserved.
+## Step 1b — Interrogate in depth
 
-**Group 3 — classification**, the decision that matters most: does it involve code? (almost
-always) → **test**. Behaviour judged over a set of cases against a bar — performance, output
-quality, non-deterministic behaviour? → **eval**. The two are not exclusive.
+Invoke `/grill-me` in orchestrated mode with what Step 1 gathered. It always runs: it decides how
+much depth the idea needs, not you. Its synthesis feeds the change:
 
-**Group 4 — readiness**: is it implemented soon, or filed for later (`pending`)?
+- **Resolved** → requirements and their scenarios.
+- **Explicitly out of scope** → the proposal's Out of scope section.
+- **Still open** → the design's Open Questions, where the implementer has room to decide.
 
-This is deliberately light — four quick questions, without yet exploring the repository in depth.
-The real interrogation is the next step.
+## Step 2 — Scope: one change, or several
 
-## Step 1b — Interrogate in depth (`/grill-me`, orchestrated mode)
+One change carries one intent (an OpenSpec rule). Independent deliverables, more than a day or
+two of work, or internal dependencies make an epic: a parent issue that lists its children,
+and one child issue per change. **You approve the split** before any change is written.
 
-Invoke the `grill-me` skill in orchestrated mode with the context Step 1 has just gathered. This step **always runs**, unless
-Step 0 already covered it — it is neither optional nor proportional to how trivial the idea seems,
-because it is `/grill-me` itself that decides how much depth is needed.
+## Step 3 — Write the change
 
-`/grill-me` explores the repository before asking, goes one question at a time with its own
-recommendation, and closes with a three-block synthesis. When it comes back:
+1. `openspec new change <id>`: kebab-case, starting with a verb (`add-`, `fix-`, `change-`,
+   `remove-`, `refactor-`).
+2. For each artifact in order — proposal, specs, design, tasks — run
+   `openspec instructions <artifact> --change <id> --json` and write it from its template and
+   its rules, which include this layer's.
+3. Read the code through the wiki (`project-wiki`). An area with no entries: `wiki-generator`
+   surveys it first. A large area: launch Explore agents with bounded questions.
+4. A technique you are unsure of: research it before fixing it in the spec.
 
-- **Resolved** → becomes the acceptance criteria in Step 4.
-- **Explicitly out of scope** → goes verbatim into the issue's section of the same name.
-- **Still open** → goes into Technical notes, so `developer` knows where there is legitimate
-  room to decide at implementation time.
+## Step 4 — Check it
 
-If `/grill-me` finds a contradiction between something you said in Step 1 and something you say
-here, it points it out directly and asks which one prevails — it does not resolve it silently,
-and neither should you resolve it on its behalf.
-
-If during the interrogation `manager` is unsure of the right technique for something specific
-— which architecture, which approach the Python docs or the literature recommend — it researches
-it before fixing the criterion. Do not guess when it can be verified.
-
-## Step 2 — Scope: one issue or an epic?
-
-Epic signals: independent deliverables, more than a day or two of work, internal dependencies.
-If they apply, **`manager` requires my explicit validation** of the decomposition before
-generating any spec:
-
-> "This looks like an epic: parent issue + N children [title — mandate — type — dependencies].
-> Shall I proceed, adjust, or keep it as a single issue?"
-
-Nothing is created until I approve.
-
-## Step 3 — Orchestrate the specs (`manager`)
-
-The `define-tests` skill whenever there is code. The `define-evals` skill if there is behaviour
-judged over cases against a bar. Both return markdown and persist no files: it is embedded in the
-issue.
-
-## Step 4 — Compose the issue (`manager`)
-
-Title: `[area]: imperative description`. Body: Description, Acceptance criteria (a
-`[test]`/`[eval]` checklist, derived from `/grill-me`'s "Resolved" block),
-TDD/EDD Specification verbatim, technical notes (include `/grill-me`'s "Still open" here),
-out of scope (`/grill-me`'s "Explicitly out of scope" block, verbatim).
-
-## Step 4b — The executable contract
-
-`specs/<n>-<slug>/ACCEPTANCE.yaml`, the executable shadow of the issue:
-
-```yaml
-spec: <n>-<slug>
-criteria:
-  - id: AC-1
-    statement: "Rejects a row with no identifier"      # binary: two people reach the same verdict
-    verification: test                                  # test | eval
-    reference: tests/test_loader.py::test_rejects_row_without_id   # eval: evals/<slug>/<id>
-    threshold: 0.95                                     # eval only: the bar over the case set
-    issue: <n>
+```bash
+openspec validate <id> --strict
+python3 .claude/skills/sdd/scripts/sdd.py check --change <id>
 ```
 
-Every criterion has exactly one verification and a reference. Present the issue only when each one
-does.
+Fix the change until both are clean.
 
-## Step 5 — Present, refine, create
+## Step 5 — Your approval
 
-`manager` shows me the complete issue. With my approval:
+Show the four files: proposal, delta specs, design, tasks. Changes go back to Step 3 and Step 4,
+then you see them again. Nothing is created until you approve explicitly.
+
+## Step 6 — Create the issue
 
 ```bash
 tmpfile=$(mktemp /tmp/issue-XXXXXX)
-cat <<'ISSUE_EOF' > "$tmpfile"
-<issue body>
-ISSUE_EOF
-issue_url=$(gh issue create --title "<title>" --body-file "$tmpfile" --label "...")
+python3 .claude/skills/sdd/scripts/sdd.py body --change <id> --out "$tmpfile"
+gh issue create --title "[<area>]: <imperative description>" --body-file "$tmpfile" --label "..."
 rm "$tmpfile"
 ```
 
-Fill in `issue: <n>` in `ACCEPTANCE.yaml`, commit `spec(#n): acceptance criteria`.
-
-No branch, no code and no PR is created. That is `/implement-issue`.
+Add `pending` if it is filed for later; a child of an epic names its parent in the title or a
+label. Then delete the draft, `openspec/changes/<id>/`: the issue holds the change now.
+Nothing is committed and no branch is created — that is `/implement-issue`.
 
 ## Principles
 
 1. No implementation.
-2. The person validates an epic's decomposition before anything is created.
-3. Specs are orchestrated, not hand-written in this skill.
-4. Researching techniques is done before fixing a criterion you are unsure about — never
-   afterwards, as a justification for something already decided.
-5. `/grill-me` always runs after the light discovery, unless it already ran standalone before this
-   skill. It is not an optional step for "simple" ideas — it decides how much depth is needed,
-   not you.
+2. The person approves the change, and an epic's split, before anything is created.
+3. The issue is the source of truth; the local draft only lives until the issue exists.
+4. `/grill-me` always runs after the light discovery, unless it already ran on its own.
+5. Research comes before a criterion is fixed, never afterwards to justify it.
