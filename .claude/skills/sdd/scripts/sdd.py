@@ -10,6 +10,7 @@ written from it, and only tasks.md gains local progress there (ticks, notes, loc
   init                    set up openspec/ (openspec init --tools none) and add the layer's rules
   body [--change ID]      print the issue body for a change (--out FILE to write it)
   branch N                print the branch for issue N: <n>-<change-id>
+  skip-specs ID [--off]   mark a change as needing no delta specs (a pure refactor), or undo it
   pull N                  write the mirror of issue N, keeping the progress already in tasks.md
   diff N                  show where the mirror and issue N differ (ticks and notes ignored)
   stale (N | --all)       report why an open issue's change may no longer apply
@@ -48,6 +49,7 @@ INSTALL = (
 )
 
 ARTIFACTS = ("proposal.md", "design.md", "tasks.md")
+SKIP_SPECS_LINE = "skip_specs: true"
 LOCAL_SECTIONS = ("## Replies to review", "## Wiki gaps")
 MAX_ROUNDS = 3
 MAX_BODY = 65536
@@ -333,6 +335,11 @@ def format_problems(cdir: Path) -> list[str]:
         problems.append(
             "design.md: no `## Files` section listing - `path` — modify or - `path` — new"
         )
+    if has_skip_specs(cdir) and any(cdir.glob("specs/**/spec.md")):
+        problems.append(
+            f"{cdir.name}: skip_specs is set but specs/ has delta files: "
+            "sdd.py skip-specs --off, or remove them"
+        )
     return problems
 
 
@@ -466,6 +473,25 @@ def schema_name(root: Path) -> str:
     return match[1] if match else "spec-driven"
 
 
+def has_skip_specs(cdir: Path) -> bool:
+    meta = cdir / ".openspec.yaml"
+    return meta.is_file() and SKIP_SPECS_LINE in meta.read_text().splitlines()
+
+
+def set_skip_specs(cdir: Path, schema: str, on: bool) -> None:
+    """Add or remove `skip_specs: true` in a change's .openspec.yaml, keeping its other lines.
+
+    A change needs this when it has no delta specs — a pure refactor, tooling or docs — so
+    OpenSpec accepts it with zero deltas instead of rejecting it as empty.
+    """
+    meta = cdir / ".openspec.yaml"
+    lines = meta.read_text().splitlines() if meta.is_file() else [f"schema: {schema}"]
+    lines = [line for line in lines if line.strip() != SKIP_SPECS_LINE]
+    if on:
+        lines.append(SKIP_SPECS_LINE)
+    meta.write_text("\n".join(lines) + "\n")
+
+
 def write_change(cdir: Path, files: dict[str, str], schema: str) -> None:
     """Write a change's files; a change with no delta specs is marked skip_specs for OpenSpec."""
     if cdir.is_dir():
@@ -482,12 +508,11 @@ def write_change(cdir: Path, files: dict[str, str], schema: str) -> None:
         target = cdir / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text)
-    meta = cdir / ".openspec.yaml"
     has_specs = any(path.startswith("specs/") for path in files)
-    if not has_specs and not meta.is_file():
-        meta.write_text(f"schema: {schema}\nskip_specs: true\n")
-    elif has_specs and meta.is_file() and "skip_specs: true" in meta.read_text():
-        meta.unlink()
+    if not has_specs:
+        set_skip_specs(cdir, schema, on=True)
+    elif has_skip_specs(cdir):
+        set_skip_specs(cdir, schema, on=False)
 
 
 def gh_issue(root: Path, number: int, fields: str) -> dict:
@@ -890,6 +915,21 @@ def cmd_branch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_skip_specs(args: argparse.Namespace) -> int:
+    root = args.root
+    cdir = root / "openspec" / "changes" / args.change
+    if not cdir.is_dir():
+        raise SddError(f"no change {args.change} in openspec/changes/")
+    if not args.off and any(cdir.glob("specs/**/spec.md")):
+        raise SddError(
+            f"{args.change} has delta specs under specs/: remove them first, "
+            "or leave skip_specs off"
+        )
+    set_skip_specs(cdir, schema_name(root), on=not args.off)
+    print(f"{args.change}: skip_specs {'off' if args.off else 'on'}")
+    return 0
+
+
 def cmd_pull(args: argparse.Namespace) -> int:
     root = args.root
     change_id, files = issue_change(root, args.issue)
@@ -1163,6 +1203,7 @@ COMMANDS = {
     "init": cmd_init,
     "body": cmd_body,
     "branch": cmd_branch,
+    "skip-specs": cmd_skip_specs,
     "pull": cmd_pull,
     "diff": cmd_diff,
     "stale": cmd_stale,
@@ -1182,6 +1223,9 @@ def main(argv: list[str] | None = None) -> int:
     body.add_argument("--out", type=Path)
     for name in ("branch", "pull", "diff"):
         sub.add_parser(name).add_argument("issue", type=int)
+    skip_specs = sub.add_parser("skip-specs")
+    skip_specs.add_argument("change")
+    skip_specs.add_argument("--off", action="store_true")
     stale = sub.add_parser("stale")
     which = stale.add_mutually_exclusive_group(required=True)
     which.add_argument("issue", type=int, nargs="?")

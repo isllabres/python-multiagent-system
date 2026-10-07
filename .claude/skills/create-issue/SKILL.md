@@ -26,8 +26,10 @@ Four quick questions, without exploring the repository yet:
 2. By type — bug: current and expected behaviour, steps, severity; feature: the problem it
    solves and what success looks like from outside; refactor: what it touches, why, and which
    behaviour must not change.
-3. Is there behaviour to verify at all? A refactor that changes none has no delta specs: its
-   tasks are `[guard]` tests and the change is marked `skip_specs`.
+3. Is there behaviour to verify at all? Some changes genuinely have none — a pure refactor, a
+   dependency bump, tooling, docs. If the person confirms there is none, this change carries no
+   delta specs: say so now, so Step 3 skips the specs artifact and marks the change
+   `skip_specs` instead of guessing it later from an empty `specs/`.
 4. Implement it soon, or file it for later (`pending`)?
 
 ## Step 1b — Interrogate in depth
@@ -49,7 +51,10 @@ and one child issue per change. **You approve the split** before any change is w
 
 1. `openspec new change <id>`: kebab-case, starting with a verb (`add-`, `fix-`, `change-`,
    `remove-`, `refactor-`).
-2. For each artifact in order — proposal, specs, design, tasks — run
+2. **If Step 1 found no behaviour to verify**: run
+   `python3 .claude/skills/sdd/scripts/sdd.py skip-specs <id>` and skip the specs artifact
+   entirely — write proposal, design and tasks only, with `[guard]`/`[code]` tasks, never
+   `[test]`. Otherwise, for each artifact in order — proposal, specs, design, tasks — run
    `openspec instructions <artifact> --change <id> --json` and write it from its template and
    its rules, which include this layer's.
 3. Read the code through the wiki (`project-wiki`). An area with no entries: `wiki-generator`

@@ -52,8 +52,13 @@ A complete example lives in `examples/add-retry-backoff/`, with the issue body i
   | `[code]` | The minimum that makes the group's tests pass | `green(#n-N.k)` |
   | `[remove]` | A REMOVED requirement: deletes its code and its tests | `remove(#n-N.k)` |
 
-  A change with no delta specs (a pure refactor) is pulled with `skip_specs: true` in its
-  `.openspec.yaml`, so OpenSpec accepts it.
+  **Not every change needs delta specs.** A pure refactor, a tooling or a docs change has no
+  observable behaviour to state, so it carries no `specs/` artifact: only `[guard]` tasks
+  (preserving behaviour) and `[code]` tasks, never `[test]`. Decide this in `/create-issue`'s
+  discovery, from the person's answer, not after the fact. Mark it with
+  `sdd.py skip-specs <id>` (`--off` to undo it), which sets `skip_specs: true` in the change's
+  `.openspec.yaml` so OpenSpec accepts zero deltas; it refuses while `specs/` still has files.
+  Pulling a change with no `specs/` files sets the same flag automatically.
 
 ## Writing the tests
 
@@ -130,6 +135,7 @@ the exit status is 1 if there is any.
 | `init` | Set up `openspec/` (`openspec init --tools none`) and add this layer's rules to its `config.yaml` |
 | `body [--change ID] [--out F]` | The issue body for a change |
 | `branch N` | The branch for issue N: `<n>-<change-id>` |
+| `skip-specs ID [--off]` | Mark a change as needing no delta specs, or undo it |
 | `pull N` | Write the mirror of issue N, keeping the progress in `tasks.md` |
 | `diff N` | Where the mirror and the issue differ |
 | `stale N` / `stale --all` | Why an open issue's change may no longer apply: validation, files the design modifies, living specs changed since the issue, a closed issue |

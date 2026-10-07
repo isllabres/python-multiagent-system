@@ -262,6 +262,53 @@ def test_a_change_without_specs_is_pulled_as_skip_specs(repo: Path) -> None:
     assert meta.read_text() == "schema: spec-driven\nskip_specs: true\n"
 
 
+def test_pulling_a_skip_specs_change_keeps_its_other_openspec_yaml_lines(
+    repo: Path,
+) -> None:
+    files = {
+        name: text
+        for name, text in sdd.change_files(EXAMPLE).items()
+        if not name.startswith("specs/")
+    }
+    publish(repo, 14, sdd.render_body("split-loader", files))
+    mirror = repo / "openspec" / "changes" / "split-loader"
+    mirror.mkdir(parents=True)
+    (mirror / ".openspec.yaml").write_text("schema: spec-driven\ncreated: 2026-01-01\n")
+    assert cli(repo, "pull", "14")[0] == 0
+    assert (mirror / ".openspec.yaml").read_text() == (
+        "schema: spec-driven\ncreated: 2026-01-01\nskip_specs: true\n"
+    )
+
+
+# --- skip_specs, for a change with no behaviour to verify --------------------------------
+
+
+def test_skip_specs_sets_and_clears_the_flag(repo: Path) -> None:
+    change = repo / "openspec" / "changes" / "split-loader"
+    change.mkdir(parents=True)
+    assert cli(repo, "skip-specs", "split-loader")[0] == 0
+    assert sdd.has_skip_specs(change)
+    assert cli(repo, "skip-specs", "split-loader", "--off")[0] == 0
+    assert not sdd.has_skip_specs(change)
+
+
+def test_skip_specs_refuses_a_change_that_has_delta_specs(repo: Path) -> None:
+    change = repo / "openspec" / "changes" / CHANGE
+    shutil.copytree(EXAMPLE, change)
+    code, _, err = cli(repo, "skip-specs", CHANGE)
+    assert code == 1 and "has delta specs" in err
+
+
+def test_skip_specs_set_and_specs_present_is_a_format_problem(tmp_path: Path) -> None:
+    change = tmp_path / CHANGE
+    shutil.copytree(EXAMPLE, change)
+    (change / ".openspec.yaml").write_text("schema: spec-driven\nskip_specs: true\n")
+    assert any(
+        "skip_specs is set but specs/ has delta files" in problem
+        for problem in sdd.format_problems(change)
+    )
+
+
 # --- format and traceability ------------------------------------------------------------
 
 

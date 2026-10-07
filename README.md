@@ -186,6 +186,10 @@ carries them):
 In the issue, each file sits between invisible markers, so GitHub shows a readable document and
 `sdd.py` can rebuild the change from it. The full example is in `.claude/skills/sdd/examples/`.
 
+Not every change needs delta specs: a pure refactor, a dependency bump or a docs change has no
+observable behaviour to state. `sdd.py skip-specs <id>` marks it so — set when `/create-issue`'s
+discovery confirms there is none — and its `tasks.md` carries only `[guard]` and `[code]` tasks.
+
 ## Tests before code
 
 There is a role for it and a check behind it. `implementer` writes each `[test]` task's test, runs
