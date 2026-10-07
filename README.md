@@ -1,13 +1,14 @@
 # python-multiagent-system
 
 A multi-agent system for Python development, for [Claude Code](https://claude.com/claude-code). It
-installs as a layer on top of a new or existing project and turns a GitHub issue into a pull
-request through four specialised roles. Each role has one job, so the one that writes the test is
-never the one that writes the code.
+installs as a layer on top of a new or existing project and turns an idea into a pull request
+through four specialised roles, spec-driven: every change is an [OpenSpec](https://github.com/Fission-AI/OpenSpec)
+change, agreed before any code exists, whose source of truth is its GitHub issue. The test of
+every scenario is written and seen failing before the code that makes it pass.
 
 ```
-idea ── /create-issue ──▶ issue + spec ── /implement-issue ──▶ local PR ──▶ GitHub PR ──▶ merge
-          you approve                        you confirm                         you review
+idea ── /create-issue ──▶ change in its issue ── /implement-issue ──▶ local PR ──▶ PR ──▶ merge
+           you approve                               you confirm                     you merge
 ```
 
 Three points need a person. Everything between them runs without asking.
@@ -18,7 +19,8 @@ The layer is a set of files you copy into your project. Your project keeps its o
 nothing here points back to this repository, and `gh` reads the repository from your project's
 remote.
 
-Requirements: Claude Code, `git`, `gh` (authenticated: no `gh`, no flow), `uv` and Python 3.11+.
+Requirements: Claude Code, `git`, `gh` (authenticated: no `gh`, no flow), `uv`, Python 3.11+, and
+the OpenSpec CLI, which needs Node.js 20.19+.
 
 ```bash
 # 1. Get the layer, once
@@ -30,15 +32,19 @@ git -C ~/code/python-multiagent-system archive origin/main .claude CLAUDE.md | t
 # 3. Tooling, in your project
 cd ~/code/my-project
 uv add --dev pytest ruff mypy
+npm install -g @fission-ai/openspec@latest        # or: brew install openspec
 gh auth status
 
-# 4. Commit the layer to your project's own repository, on its own branch
+# 4. Set up OpenSpec (openspec init --tools none) and add this layer's rules to its config
+python3 .claude/skills/sdd/scripts/sdd.py init
+
+# 5. Commit the layer to your project's own repository, on its own branch
 git switch -c add-multiagent-layer
-git add .claude CLAUDE.md
+git add .claude CLAUDE.md openspec
 git commit -m "Add the python-multiagent-system layer"
 git push -u origin add-multiagent-layer
 
-# 5. Start working
+# 6. Start working
 claude --agent manager
 ```
 
@@ -75,13 +81,23 @@ pull requests.
 
   then add the line `@CLAUDE.multiagent.md` to your `CLAUDE.md`. Claude Code imports files with
   `@path`, resolved relative to the file that mentions it.
+- **An existing `.claude/settings.json` is overwritten too.** Merge its `hooks` and `permissions`
+  blocks into yours by hand: without the hooks the flow still works, but nothing holds back a
+  change marked as done that fails its checks.
+- **If you already use OpenSpec**, `sdd.py init` keeps your `openspec/` as it is. When your
+  `config.yaml` has rules of its own, it prints this layer's block for you to merge. Any `/opsx`
+  commands you have stay available, but `/opsx:apply` skips red/green, the reviewer and the issue:
+  implement issues with `/implement-issue`.
 - **The wiki starts empty.** `wiki-generator` creates `wiki/` on its first call, and `check_wiki.py`
   reports missing pages until then.
-- **The first whole-change check needs the network.** `tester` crawls The Python Wiki once (about a
-  minute, at most 80 requests) and caches it for 180 days in `.claude/cache/`, which git-ignores
-  itself.
 - **Your layout is respected.** The layer never creates `src/` or `tests/`; it creates only its own
-  output: `specs/`, `evals/` and `wiki/`.
+  output: `openspec/` (when the project does not have it) and `wiki/`.
+
+### Upgrading from the issue-and-ACCEPTANCE.yaml version
+
+Old `specs/<n>-<slug>/ACCEPTANCE.yaml` folders are ignored. An open issue from before this flow has
+no OpenSpec change in its body: `/update-issue <n> -- convert to OpenSpec` writes one with your
+approval. `/review-issue` is gone; `sdd.py stale --all` does its job.
 
 ### Use it
 
@@ -89,12 +105,12 @@ Inside the session, three commands take you from an idea to a pull request:
 
 ```
 > /grill-me "add retry with backoff to the HTTP client"   # optional: stress-test a raw idea first
-> /create-issue feature     # discovery, interrogation and specs; you approve, it files the issue
-> /implement-issue 12       # red, green, checks, wiki; stops at a local PR for you to confirm
+> /create-issue feature     # discovery, interrogation, the change; you approve, it files the issue
+> /implement-issue 12       # tests first, then code, review, wiki; stops at a local PR for you
 ```
 
-After you confirm, it pushes the branch and opens the PR on your remote. You review it on GitHub;
-merging is accepting the result. The whole flow is described under *How a change flows*.
+After you confirm, it archives the change, pushes the branch and opens the PR on your remote. You
+review it on GitHub; merging is accepting the result.
 
 ## The four roles
 
@@ -103,101 +119,97 @@ below owns one thing and never does the others'.
 
 | Role | Model | Owns | Never |
 |---|---|---|---|
-| `manager` | opus | The spec and the session: interrogates until the idea converges, writes the issue, runs the other roles, keeps the round tally, confirms the red test matches the criterion, decides disputes over a test or the spec | Reviews the code `developer` writes, or writes or runs code, tests or evals |
-| `tester` | opus | The tests and the verdict: writes each criterion's red check from the spec and proves it fails for the right reason, checks the green, guards against tests bent to pass, runs the whole suite, then judges the whole change as Python (semantics, structure, ruff, mypy) with The Python Wiki as a reference | Edits production code |
-| `developer` | sonnet | The implementation: makes the red green with the minimum idiomatic, typed Python, one criterion at a time | Writes, edits, skips or deletes a test |
-| `wiki-generator` | sonnet | The project wiki: one changelog line per commit and an entry when behaviour or architecture changed; surveys areas the wiki does not cover yet | Touches `README.md`, `CLAUDE.md` or `wiki/raw/` |
+| `manager` | opus | The spec and the session: interrogates until the idea converges, writes the change, files and amends the issue, runs the other roles, keeps the round tally, decides disputes over the spec. The only role that writes to GitHub | Writes code or tests, reviews code |
+| `implementer` | sonnet | The implementation: works through `tasks.md`, writing each scenario's test and seeing it fail before the minimum idiomatic, typed code that makes it pass | Touches the spec, `review.md` or the issue |
+| `reviewer` | opus | The verdict: the mechanical checks, each test against its scenario, the suite and tooling, the Python against `python-standards`, a clean scope. Writes `review.md` and nothing else | Writes code or tests, commits |
+| `wiki-generator` | sonnet | The project wiki: once per issue, a changelog line and an entry when behaviour or architecture changed; surveys areas the wiki does not cover yet | Touches `README.md`, `CLAUDE.md` or `wiki/raw/` |
 
-Only `manager` delegates to the other roles. `tester` reports back to it, and it hands each finding
-in production code to `developer` and keeps the count.
+Only `manager` delegates. The others write their work to files and reply with one line that names
+the file, so nothing is relayed by word of mouth.
 
 ## How a change flows
 
-### 1. Create the issue: `/create-issue`
+### 1. Write and approve the change: `/create-issue`
 
 `manager` runs a light discovery, then `/grill-me` interrogates in depth, one question at a time with
 its own recommendation, reading the project's wiki before it asks anything the code can answer. It
-decides whether the work is one issue or an epic (you approve the split), has `define-tests` and
-`define-evals` write the specs, and files the issue together with
-`specs/<n>-<slug>/ACCEPTANCE.yaml`. **You approve before anything is
-created.**
+decides whether the work is one change or an epic (you approve the split), writes the change in
+`openspec/changes/<id>/` from `openspec instructions`, and validates it with
+`openspec validate --strict` and `sdd.py check`. **You approve the four files**; then the change
+becomes the body of a new issue and the local draft is deleted.
 
 ### 2. Implement it: `/implement-issue <n>`
 
-- **Step 1.** Read the issue (a `pending` one suggests `/review-issue` first; an `epic` is not
-  implemented directly).
-- **Step 2.** Create the local branch `<n>-<slug>`. Nothing touches GitHub yet.
-- **Step 3.** If the wiki has no entries for the area the issue touches, `wiki-generator` surveys it.
-- **Step 4, per criterion.** `tester` writes the red check, `manager` confirms it matches the
-  criterion, `developer` makes it green, `tester` checks the result.
-- **Step 5, whole change.** `tester` runs the full suite and the evals, then reviews the diff as
-  Python. Findings go back to `developer`; `tester` fixes its own tests.
-- **Step 6.** Check the wiki: every commit has its changelog line and no anchor points at missing code.
-- **Step 7.** Run `ruff`, `mypy` and `pytest`, assemble the local PR, and **show it to you**: diff,
-  commits, evidence, wiki.
-- **Step 8.** Only with your confirmation: push and open the PR. It never merges, approves or
-  closes the issue.
-
-After every commit in steps 4 and 5, `manager` calls `wiki-generator`.
+- **Still applies?** `sdd.py stale <n>` validates the change against today's living specs and
+  checks that what the design modifies still exists. If not, it stops and proposes `/update-issue`.
+- **Branch and mirror.** The branch `<n>-<change-id>`, and `sdd.py pull <n>` writes the issue's
+  change into `openspec/changes/<id>/`. When it resumes, `sdd.py diff <n>` first: if the issue
+  changed meanwhile, it stops and shows you.
+- **Implement.** `implementer` works through `tasks.md`: red, then green, task by task.
+- **Review.** `reviewer` writes `review.md`. Up to three rounds of changes; the fourth blocks the
+  change, labels the issue and comments the history.
+- **Wiki and local PR.** `wiki-generator` updates the wiki once, the checks run, and you see the
+  diff, the commits, the review and the wiki pages.
+- **Only with your confirmation:** `openspec archive` (the living specs take the change), push,
+  and the PR with `Closes #n`. It never merges.
 
 ### 3. Merge: you
 
-You review the PR on GitHub. Merging is accepting the result.
+You review the PR on GitHub. Merging is accepting the result, and it updates the code and
+`openspec/specs/` together.
 
 ### Keeping issues honest
 
-`/review-issue <n | --all>` checks whether a `pending` issue is still valid against today's code. `/update-issue <n> -- <change>` applies a change by re-running `/create-issue`.
+`/update-issue <n> -- <change>` is the only way an approved change changes: it shows you the
+difference, and with your approval edits the issue and the branch's mirror. `sdd.py stale --all`
+lists the open issues whose change may no longer apply.
 
-## Two loops, one round budget
+## The change
 
-```
-per criterion:  tester (red) → manager (matches the criterion?) → developer (green) ↔ tester
-whole change:   tester (suite, then Python) ↔ developer; tester fixes its own tests
-                every fix goes back through the suite
-```
+An OpenSpec change, with this layer's rules (in `openspec/config.yaml`, so `openspec instructions`
+carries them):
 
-`manager` keeps one tally per criterion across **both** loops, so a fix that moves from one loop to
-the other does not reset it. The cap is 3 rounds; the fourth stops, comments the history on the
-issue and waits for you.
+- `proposal.md` — why, what changes, the capabilities, the impact, what is out of scope.
+- `specs/<capability>/spec.md` — `ADDED`/`MODIFIED`/`REMOVED` requirements, each one behaviour
+  with a single SHALL, each scenario binary and concrete (`- **WHEN** …` / `- **THEN** …`).
+- `design.md` — always: the files it touches, the decisions with a discarded alternative, risks.
+- `tasks.md` — one group per requirement, one test task per scenario before the code:
 
-## How a criterion is verified
+```markdown
+## 1. Requirement: Retry server errors
 
-Every acceptance criterion is verified one of two ways, according to the nature of the verdict:
-
-| | Verdict | Example |
-|---|---|---|
-| **test** (TDD) | Binary, repeatable: same input, same output | "rejects a row with no identifier" |
-| **eval** (EDD) | Binary per case, with a bar over the case set | "at least 95% of the fixtures render", "p95 latency under 200 ms" |
-
-`ACCEPTANCE.yaml` is the issue's executable shadow, with exactly one verification per criterion:
-
-```yaml
-spec: 12-loader-validation
-criteria:
-  - id: AC1
-    statement: "Rejects a row with no identifier"
-    verification: test            # test | eval
-    reference: tests/test_loader.py::test_rejects_row_without_id
-    issue: 12
+- [ ] 1.1 [test] `tests/test_client.py::test_server_error_is_retried` — Scenario: Server error is retried
+- [ ] 1.2 [test] `tests/test_client.py::test_retries_are_exhausted` — Scenario: Retries are exhausted
+- [ ] 1.3 [code] Retry 5xx responses in `HttpClient.get` with exponential backoff; both tests pass
 ```
 
-An `eval` criterion also carries a `threshold:` (the bar over its cases), and its `reference` is the
-eval id under `evals/`.
+In the issue, each file sits between invisible markers, so GitHub shows a readable document and
+`sdd.py` can rebuild the change from it. The full example is in `.claude/skills/sdd/examples/`.
 
-## Red before green
+## Tests before code
 
-There is no hook for it: it is a role. `tester` writes each criterion's test or eval and runs it
-before `developer` starts, and commits it only if it fails for the right reason (the behaviour is
-missing, not a typo in the test). `developer` then makes it pass without ever editing a test.
-Afterwards `tester` checks the history: no `green` commit may touch a test, an eval runner or a case
-file, and no assertion may have been loosened, skipped or deleted.
+There is a role for it and a check behind it. `implementer` writes each `[test]` task's test, runs
+it, and commits it only if it fails because the behaviour is missing. `sdd.py check --base` then
+reads the history: in every group the `red` commit comes before the `green`, `red` commits touch
+only tests, `green` commits never touch one, a test changed after its green cites the review
+finding, and every ticked task has its commit. `reviewer` reads each test against its scenario,
+looking for anything loosened, skipped or hardcoded.
+
+## Hooks
+
+`.claude/settings.json` keeps the flow honest without relying on the model's memory:
+
+- **SessionStart** prints where the active change stands — tasks done, the next one, the review
+  round — so a new session resumes where the last one stopped.
+- **Stop** holds back the end of a turn when a change marked as done fails `sdd.py check`, `ruff`
+  or `pytest`. Unfinished or blocked work stops freely.
 
 ## The wiki is the code map
 
-Every role reads the project wiki (`wiki/`) before it reads code. Its entries say what a part does
-and why, point at the code with anchors (`src/loader.py:load_rows`) and at the tests that verify it,
-and link to related entries. A role finds the entry, follows the anchor and reads that symbol, not
-the whole module.
+Every role reads the project wiki (`wiki/`) before it reads code. Its entries point at the code with
+anchors (`src/client.py:HttpClient.get`), at the tests that verify it and at the capability's
+living spec in `openspec/specs/`, which holds what the system does. A role finds the entry, follows
+the anchor and reads that symbol, not the whole module.
 
 ```
 Home.md  _Sidebar.md  log.md  raw/
@@ -205,27 +217,27 @@ Home.md  _Sidebar.md  log.md  raw/
 4.-Testing-and-Evaluation.md          5.-Decisions-and-Known-Issues.md   6.-Production-and-Monitoring.md
 ```
 
-It is brief by rule: `log.md` gets exactly one line per commit; an entry is edited only when
-behaviour or architecture changed, or when something it points at moved; at most two pages per
-commit, five new lines at most, a page past 100 lines is condensed. A checker enforces this and fails
-on anchors pointing at code that no longer exists:
+It is brief by rule: `wiki-generator` updates it once per issue — one `log.md` line, an entry only
+when behaviour or architecture changed, three pages and 15 net lines at most, a page past 100 lines
+condensed. A checker fails on anchors pointing at code that no longer exists:
 
 ```bash
-python3 .claude/skills/project-wiki/scripts/check_wiki.py --base main
+python3 .claude/skills/project-wiki/scripts/check_wiki.py
 ```
-
-On an existing project the wiki starts empty and fills area by area, as issues touch them.
 
 ## Commits
 
-One commit per criterion and colour, subjects of 72 characters at most, imperative, naming the
-behaviour. A criterion's history reads:
+One commit per task, subjects of 72 characters at most, imperative, naming the behaviour. An
+issue's history reads:
 
 ```
-red(#12-AC1): reject rows without customer_id            tester
-wiki(#12-AC1): log 3f1f4c0                               wiki-generator
-green(#12-AC1): validate customer_id in load_rows        developer
-wiki(#12-AC1): document customer_id validation           wiki-generator
+spec(#12): pull change add-retry-backoff                     manager
+red(#12-1.1): retry a request that fails with 503            implementer
+red(#12-1.2): give up after three 503 responses              implementer
+green(#12-1.3): retry 5xx in HttpClient.get with backoff     implementer
+wiki(#12): document retries in the HTTP client               wiki-generator
+spec(#12): review add-retry-backoff                          manager
+spec(#12): archive add-retry-backoff                         manager
 ```
 
 ## Skills
@@ -236,26 +248,28 @@ not an identity: the skill orchestrates, the agent executes.
 | Skill | What it does |
 |---|---|
 | `/grill-me` | Interrogates a plan in depth, one question at a time, with a recommendation. Standalone or inside `/create-issue` |
-| `/create-issue` | Discovery, grilling, specs, then files the issue. You approve before it is created |
-| `/implement-issue` | The eight steps above, ending in a local PR you confirm |
-| `/review-issue` | Detects whether a `pending` issue is still valid |
-| `/update-issue` | Applies a requested change to an existing issue |
-| `define-tests` | The TDD spec: behaviours, cases, doubles, red-green-refactor sequence (used by `manager`) |
-| `define-evals` | The EDD spec: cases judged against a bar, for performance, output quality or non-deterministic behaviour (used by `manager`) |
-| `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling. `developer` and `tester` write against it, and `tester` checks the whole change against it |
-| `commit-messages` | The `red`, `green` and `wiki` commit conventions, shared by `tester`, `developer` and `wiki-generator` |
+| `/create-issue` | Discovery, grilling, the OpenSpec change; you approve it and it becomes the issue |
+| `/implement-issue` | Staleness check, branch and mirror, implementer and reviewer, wiki, local PR; resumes where it stopped |
+| `/update-issue` | Changes an approved change, with your approval, in the issue and the branch's mirror |
+| `sdd` | The issue and its change, the format and task rules, states, checkpoints, and `sdd.py` (used by `manager`, `implementer` and `reviewer`) |
+| `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling |
 | `project-wiki` | How every role reads the wiki as a code map, the entry format, and the checker |
-| `python-wiki-graph` | On the tester's first whole-change check, builds a cached graph of The Python Wiki (an archive) so it can pick the pages that bear on the code it is validating. One bounded crawl, polite to the site |
 
 ## What you will find in the repository
 
 ```
-CLAUDE.md                 The contract. The only document that has to be read in full.
+CLAUDE.md                 The contract: the map and the hard rules.
 .claude/
   agents/*.md             The four roles.
-  skills/*/SKILL.md       The eleven skills, with the scripts and tests that go with them.
-specs/                    The executable shadow of each issue.
-evals/                    The cases an eval is judged over.
+  skills/*/SKILL.md       The seven skills, with the scripts, tests and example that go with them.
+  settings.json           The SessionStart and Stop hooks, and the permissions they need.
+```
+
+And in your project, once it is used:
+
+```
+openspec/specs/           What the system does now: the living specs.
+openspec/changes/<id>/    A change being implemented, on its branch (archived by its PR).
 wiki/                     A native GitHub Wiki: the code map and the changelog.
 ```
 
@@ -263,9 +277,10 @@ wiki/                     A native GitHub Wiki: the code map and the changelog.
 
 ## Code quality
 
-Before any local PR is shown: `uv run ruff check .`, `uv run ruff format --check <touched paths>`,
-`uv run mypy <touched paths>` and `uv run pytest -q`. `mypy` is reported but does not block, by
-design; a blocking check is never relaxed to turn it green.
+Before any local PR is shown: `sdd.py check --base <default-branch> --remote`, `check_wiki.py`,
+`uv run ruff check .`, `uv run ruff format --check <touched paths>`, `uv run mypy <touched paths>`
+and `uv run pytest -q`. `mypy` is reported but does not block, by design; a blocking check is never
+relaxed to turn it green.
 
 `ruff format` is a drop-in replacement for Black and `ruff check` covers the Flake8 rules (and
 isort's, with the `I` set), so the three tools are not added separately: Black and Ruff can disagree
