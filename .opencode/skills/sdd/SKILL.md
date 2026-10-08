@@ -127,7 +127,7 @@ A round is a CHANGES_REQUESTED row; the cap is 3, and the fourth blocks the chan
 
 ## sdd.py
 
-`python3 .claude/skills/sdd/scripts/sdd.py [--root DIR] <command>`. Each problem is one line;
+`python3 .opencode/skills/sdd/scripts/sdd.py [--root DIR] <command>`. Each problem is one line;
 the exit status is 1 if there is any.
 
 | Command | Does |
@@ -143,4 +143,4 @@ the exit status is 1 if there is any.
 | `check [--change ID] [--base B] [--remote]` | Format and traceability; `--base` adds ticks, commit discipline, tests that exist and the wiki line; `--remote` adds drift from the issue |
 | `stop-gate` | The Stop hook: exit 2 when work marked as done fails its checks |
 
-Tests: `uv run pytest .claude/skills/sdd/tests -q` (one test needs the OpenSpec CLI on the PATH).
+Tests: `uv run pytest .opencode/skills/sdd/tests -q` (one test needs the OpenSpec CLI on the PATH).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that the project wiki is brief, connected and still points at real code.
 
-    python3 .claude/skills/project-wiki/scripts/check_wiki.py [--wiki wiki] [--root .]
+    python3 .opencode/skills/project-wiki/scripts/check_wiki.py [--wiki wiki] [--root .]
 
 Checks, each reported as one line; exit status 1 if there is any:
   structure   Home, _Sidebar, log and the six pages exist; the sidebar links all six

@@ -50,7 +50,7 @@ See: [http-client](../openspec/specs/http-client/spec.md)
 ## The checker
 
 ```bash
-python3 .claude/skills/project-wiki/scripts/check_wiki.py
+python3 .opencode/skills/project-wiki/scripts/check_wiki.py
 ```
 
 It prints one line per problem and exits 1 if there is any: a missing page or a sidebar that does

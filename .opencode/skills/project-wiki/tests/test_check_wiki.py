@@ -1,6 +1,6 @@
 """Tests for check_wiki.py, on throwaway wikis and throwaway git repositories.
 
-Run: uv run pytest .claude/skills/project-wiki/tests -q
+Run: uv run pytest .opencode/skills/project-wiki/tests -q
 """
 
 import importlib.util

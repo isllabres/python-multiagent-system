@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Keep a GitHub issue and its OpenSpec change in step, and check the change is built test-first.
 
-    python3 .claude/skills/sdd/scripts/sdd.py [--root DIR] <command> [options]
+    python3 .opencode/skills/sdd/scripts/sdd.py [--root DIR] <command> [options]
 
 The issue is the source of truth. Its body carries the change's proposal, delta specs, design
 and tasks between invisible markers; openspec/changes/<id>/ on the branch <n>-<id> is a mirror

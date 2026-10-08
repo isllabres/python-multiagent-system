@@ -1,6 +1,6 @@
 """Tests for sdd.py, on throwaway git repositories with fake `gh` and `openspec` executables.
 
-Run: uv run pytest .claude/skills/sdd/tests -q
+Run: uv run pytest .opencode/skills/sdd/tests -q
 The test marked `real_openspec` runs only when the OpenSpec CLI is on the PATH.
 """
 
