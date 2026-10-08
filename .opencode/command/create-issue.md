@@ -1,8 +1,9 @@
 ---
-name: create-issue
 description: Turns an idea into an approved OpenSpec change held by a GitHub issue — light discovery, /grill-me, scope, then the change's proposal, delta specs, design and tasks written and validated locally, your approval, and the issue. manager drives and writes. Never implements.
-argument-hint: "[bug | feature | refactor]"
+agent: manager
 ---
+
+Usage: `/create-issue [bug | feature | refactor]`
 
 `manager` drives the discovery and writes. Nothing is implemented in this skill, and nothing
 reaches GitHub until you approve the change. `sdd` has the format and the rules.
@@ -13,7 +14,7 @@ Type hint: $ARGUMENTS
 
 - `gh auth status` passes and `gh repo view` names the repository. Without them, stop.
 - The OpenSpec CLI is installed (`openspec --version`) and `openspec/` exists. If it does not,
-  run `python3 .claude/skills/sdd/scripts/sdd.py init`.
+  run `python3 .opencode/skills/sdd/scripts/sdd.py init`.
 - You are on the default branch; if not, ask before going on.
 - If this conversation already holds a `/grill-me` synthesis (Resolved / Explicitly out of
   scope / Still open), skip Steps 1 and 1b and use it.
@@ -34,8 +35,8 @@ Four quick questions, without exploring the repository yet:
 
 ## Step 1b — Interrogate in depth
 
-Invoke `/grill-me` in orchestrated mode with what Step 1 gathered. It always runs: it decides how
-much depth the idea needs, not you. Its synthesis feeds the change:
+Invoke the `grill-me` agent via the task tool with what Step 1 gathered. It always runs: it
+decides how much depth the idea needs, not you. Its synthesis feeds the change:
 
 - **Resolved** → requirements and their scenarios.
 - **Explicitly out of scope** → the proposal's Out of scope section.
@@ -52,20 +53,20 @@ and one child issue per change. **You approve the split** before any change is w
 1. `openspec new change <id>`: kebab-case, starting with a verb (`add-`, `fix-`, `change-`,
    `remove-`, `refactor-`).
 2. **If Step 1 found no behaviour to verify**: run
-   `python3 .claude/skills/sdd/scripts/sdd.py skip-specs <id>` and skip the specs artifact
+   `python3 .opencode/skills/sdd/scripts/sdd.py skip-specs <id>` and skip the specs artifact
    entirely — write proposal, design and tasks only, with `[guard]`/`[code]` tasks, never
    `[test]`. Otherwise, for each artifact in order — proposal, specs, design, tasks — run
    `openspec instructions <artifact> --change <id> --json` and write it from its template and
    its rules, which include this layer's.
 3. Read the code through the wiki (`project-wiki`). An area with no entries: `wiki-generator`
-   surveys it first. A large area: launch Explore agents with bounded questions.
+   surveys it first. A large area: launch the `explore` agent with bounded questions.
 4. A technique you are unsure of: research it before fixing it in the spec.
 
 ## Step 4 — Check it
 
 ```bash
 openspec validate <id> --strict
-python3 .claude/skills/sdd/scripts/sdd.py check --change <id>
+python3 .opencode/skills/sdd/scripts/sdd.py check --change <id>
 ```
 
 Fix the change until both are clean.
@@ -79,7 +80,7 @@ then you see them again. Nothing is created until you approve explicitly.
 
 ```bash
 tmpfile=$(mktemp /tmp/issue-XXXXXX)
-python3 .claude/skills/sdd/scripts/sdd.py body --change <id> --out "$tmpfile"
+python3 .opencode/skills/sdd/scripts/sdd.py body --change <id> --out "$tmpfile"
 gh issue create --title "[<area>]: <imperative description>" --body-file "$tmpfile" --label "..."
 rm "$tmpfile"
 ```
@@ -93,5 +94,5 @@ Nothing is committed and no branch is created — that is `/implement-issue`.
 1. No implementation.
 2. The person approves the change, and an epic's split, before anything is created.
 3. The issue is the source of truth; the local draft only lives until the issue exists.
-4. `/grill-me` always runs after the light discovery, unless it already ran on its own.
+4. `grill-me` always runs after the light discovery, unless it already ran on its own.
 5. Research comes before a criterion is fixed, never afterwards to justify it.

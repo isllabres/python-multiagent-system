@@ -1,11 +1,12 @@
 ---
-name: update-issue
 description: Changes the OpenSpec change an issue holds — the only way a spec changes after it was approved. Applies the requested change keeping proposal, specs, design and tasks coherent, validates it, shows you the difference, and with your approval edits the issue and the branch's mirror. Also refreshes a stale issue and converts an issue that predates OpenSpec.
-argument-hint: "<issue number> -- <what to change>"
+agent: manager
 ---
 
+Usage: `/update-issue <issue number> -- <what to change>`
+
 `manager` drives this. The issue is the source of truth (`sdd`), so the change goes to the issue
-first and the mirror follows. `sdd.py` below is `python3 .claude/skills/sdd/scripts/sdd.py`.
+first and the mirror follows. `sdd.py` below is `python3 .opencode/skills/sdd/scripts/sdd.py`.
 
 ## Step 1 — The change as it stands
 

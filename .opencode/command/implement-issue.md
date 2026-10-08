@@ -1,13 +1,14 @@
 ---
-name: implement-issue
 description: Implements an issue's OpenSpec change on the branch <n>-<change-id> — checks the issue still applies, mirrors it, has the implementer build it test-first and the reviewer judge it, updates the wiki once, and assembles a local PR. Resumes where it stopped. Does not touch GitHub until you confirm.
-argument-hint: "<issue number>"
+agent: manager
 ---
+
+Usage: `/implement-issue <issue number>`
 
 `manager`, the main agent, runs this sequence: it delegates, passes paths rather than content,
 keeps the round tally and never reviews the code. Nothing is pushed or opened on GitHub until
 Step 7, and only with your explicit confirmation. `sdd` has the rules; `sdd.py` below is
-`python3 .claude/skills/sdd/scripts/sdd.py`.
+`python3 .opencode/skills/sdd/scripts/sdd.py`.
 
 Detect the repository with `gh repo view`. If `gh auth status` fails, stop.
 
@@ -47,8 +48,8 @@ Purely local: nothing here writes to the remote.
 
 ## Step 4 — Implement
 
-Ask `implementer` to work through `openspec/changes/<id>/tasks.md` from its first unticked task.
-It replies one line:
+Ask the `implementer` agent, via the task tool, to work through
+`openspec/changes/<id>/tasks.md` from its first unticked task. It replies one line:
 
 - `done -> …/tasks.md` → Step 5.
 - `blocked -> …/tasks.md` → read the `BLOCKED` note. A spec problem: requirements or design
@@ -58,7 +59,8 @@ It replies one line:
 
 ## Step 5 — Review, and the round tally
 
-Ask `reviewer` to review `<id>` against the default branch. It writes `review.md` and replies:
+Ask the `reviewer` agent, via the task tool, to review `<id>` against the default branch. It
+writes `review.md` and replies:
 
 - `APPROVED -> …/review.md` → Step 6.
 - `CHANGES_REQUESTED -> …/review.md` → count the CHANGES_REQUESTED rows in its Rounds table.
@@ -69,12 +71,12 @@ Ask `reviewer` to review `<id>` against the default branch. It writes `review.md
 
 ## Step 6 — Wiki and the local PR
 
-1. Call `wiki-generator` with the issue, the change and the `## Wiki gaps` noted in `tasks.md`
-   and `review.md`. It replies `wiki -> <sha>`.
+1. Call the `wiki-generator` agent, via the task tool, with the issue, the change and the
+   `## Wiki gaps` noted in `tasks.md` and `review.md`. It replies `wiki -> <sha>`.
 2. Check:
 
    ```bash
-   python3 .claude/skills/project-wiki/scripts/check_wiki.py
+   python3 .opencode/skills/project-wiki/scripts/check_wiki.py
    sdd.py check --base <default-branch> --remote
    ```
 
