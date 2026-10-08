@@ -1,8 +1,8 @@
-# CLAUDE.md — working contract
+# AGENTS.md — working contract
 
-Instructions for Claude Code in this repository. This file is the map and the hard rules; the
-detail lives in the roles (`.claude/agents/`) and the skills (`.claude/skills/`), read when they
-are needed.
+Instructions for OpenCode in this repository. This file is the map and the hard rules; the
+detail lives in the roles (`.opencode/agent/`) and the skills (`.opencode/skills/`), read when
+they are needed.
 
 ## The idea
 
@@ -21,12 +21,12 @@ gets learned).
 
 | What | Holds | Read it |
 |---|---|---|
-| `CLAUDE.md` | The contract | Always |
-| `.claude/skills/sdd/` | Issue and change, the four files, tasks, states, checkpoints, `sdd.py` | Before writing, implementing or reviewing a change |
-| `.claude/agents/*.md` | The four roles | When you delegate to one |
-| `.claude/skills/create-issue`, `implement-issue`, `update-issue`, `grill-me` | The workflows | When you run one |
-| `.claude/skills/python-standards/` | The Python rubric | Before writing or reviewing code |
-| `.claude/skills/project-wiki/` | How to read the wiki, its format and checker | Before reading code |
+| `AGENTS.md` | The contract | Always |
+| `.opencode/skills/sdd/` | Issue and change, the four files, tasks, states, checkpoints, `sdd.py` | Before writing, implementing or reviewing a change |
+| `.opencode/agent/*.md` | The five agents | When you delegate to one |
+| `.opencode/command/*.md` | The workflows (`/create-issue`, `/implement-issue`, `/update-issue`, `/grill-me`) | When you run one |
+| `.opencode/skills/python-standards/` | The Python rubric | Before writing or reviewing code |
+| `.opencode/skills/project-wiki/` | How to read the wiki, its format and checker | Before reading code |
 | `openspec/specs/` | What the system does now: the living specs | Before changing behaviour |
 | `openspec/changes/<id>/` | The change on its branch, mirrored from its issue | While implementing it |
 | `wiki/` | The code map and the log of changes | Before reading code |
@@ -53,16 +53,21 @@ idea ── /create-issue ──▶ change in its issue ── /implement-issue 
 `/implement-issue` runs between the gates without asking, and resumes where it stopped.
 `/update-issue` is the only way an approved change changes.
 
-## Four roles
+## Five agents, each on its own model
 
-| Role | Model | Writes | Never |
-|---|---|---|---|
-| `manager` | opus | The change, the issue (the only role on GitHub), `spec(#n)` commits | Code, tests, reviewing code |
-| `implementer` | sonnet | Tests first, then the code, ticks in `tasks.md`; `red`/`guard`/`green`/`remove` commits | The spec, `review.md`, the issue |
-| `reviewer` | opus | `review.md` only | Code, tests, commits, GitHub |
-| `wiki-generator` | sonnet | `wiki/`, one `wiki(#n)` commit per issue | `README.md`, `CLAUDE.md`, `wiki/raw/` |
+| Agent | Mode | Model | Writes | Never |
+|---|---|---|---|---|
+| `manager` | primary | `anthropic/claude-opus-5-5` | The change, the issue (the only agent on GitHub), `spec(#n)` commits | Code, tests, reviewing code |
+| `implementer` | subagent | `anthropic/claude-sonnet-5-5` | Tests first, then the code, ticks in `tasks.md`; `red`/`guard`/`green`/`remove` commits | The spec, `review.md`, the issue |
+| `reviewer` | subagent | `anthropic/claude-opus-5-5` | `review.md` only | Code, tests, commits, GitHub |
+| `wiki-generator` | subagent | `anthropic/claude-sonnet-5-5` | `wiki/`, one `wiki(#n)` commit per issue | `README.md`, `AGENTS.md`, `wiki/raw/` |
+| `grill-me` | all | `anthropic/claude-opus-5-5` | Nothing: a synthesis, handed back or shown to you | Code, files, the issue |
 
-Researching techniques is not a role: `manager` and `implementer` use their research tools
+Each agent's `model:` is an independent `provider/model-id`: these five can just as well run on
+five different providers (Anthropic, OpenAI, GitHub Copilot, …), once you hold credentials for
+each. `README.md` has the exact steps.
+
+Researching techniques is not an agent: `manager` and `implementer` use their research tools
 before fixing a choice they are unsure of.
 
 ## States, deduced and never stored
@@ -100,8 +105,8 @@ confirm the local PR.
 ## Before showing any local PR
 
 ```
-python3 .claude/skills/sdd/scripts/sdd.py check --base <default-branch> --remote
-python3 .claude/skills/project-wiki/scripts/check_wiki.py
+python3 .opencode/skills/sdd/scripts/sdd.py check --base <default-branch> --remote
+python3 .opencode/skills/project-wiki/scripts/check_wiki.py
 uv run ruff check .
 uv run ruff format --check <touched paths>
 uv run mypy <touched paths>
@@ -112,16 +117,15 @@ uv run pytest -q
 relaxed to turn it green. `ruff format` is compatible with Black's output and `ruff check`
 includes isort's rules with the `I` set: one tool, two modes.
 
-## Hooks
+## The Stop gate
 
-`.claude/settings.json` runs `sdd.py` at two moments, so the discipline does not depend on the
-model remembering it:
-
-- **SessionStart** — `sdd.py status --brief` tells the session which change is active and where
-  to resume. It reads disk and git only and never blocks.
-- **Stop** — `sdd.py stop-gate` exits 2 when a change marked as done (every task ticked, or the
-  review APPROVED) fails `sdd.py check --base`, `ruff check` or `pytest`. Unfinished or blocked
-  work stops freely, and a second stop is never held back.
+`.opencode/plugin/stop-gate.ts` runs `sdd.py stop-gate` whenever a session goes idle, so the
+discipline does not depend on the model remembering it: when a change marked as done (every
+task ticked, or the review APPROVED) fails `sdd.py check --base`, `ruff check` or `pytest`, it
+sends one follow-up message with the failure, so you see it fixed or blocked instead of
+silently abandoned. Unfinished or blocked work goes idle freely, and it retries at most once in
+a row. `manager`'s own first action in a new session — `sdd.py status --brief` — is the
+equivalent of what used to be a separate `SessionStart` hook: it never blocked, only informed.
 
 ## The wiki
 
