@@ -18,6 +18,8 @@ written from it, and only tasks.md gains local progress there (ticks, notes, loc
   check [--change ID] [--base BRANCH] [--remote] [--issue N]
                           format and traceability; with --base, ticks, commit discipline and
                           tests; with --remote, drift from the issue
+  tokenomics N            append this issue's round count and a cumulative token/cost snapshot
+                          (from `opencode stats`) to tokenomics.md, for comparison over time
   stop-gate               the Stop hook: exit 2 when work that claims to be done fails a check
 
 Every problem is one line; the exit status is 1 if there is any.
@@ -26,6 +28,7 @@ Every problem is one line; the exit status is 1 if there is any.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import difflib
 import functools
 import importlib.util
@@ -77,6 +80,11 @@ SCENARIO = re.compile(r"^#### Scenario:\s*(.+?)\s*$")
 FILES_ENTRY = re.compile(r"^- `([^`]+)`\s+[—-]\s+(modify|new)\b")
 VERDICT = re.compile(r"^\*\*Verdict:\*\*\s*(APPROVED|CHANGES_REQUESTED)\b", re.M)
 ROUND_ROW = re.compile(r"^\|\s*\d+\s*\|\s*(APPROVED|CHANGES_REQUESTED)\s*\|", re.M)
+TOKENOMICS_ROW = re.compile(
+    r"^\|\s*#(\d+)\s*\|\s*([a-z0-9][a-z0-9-]*)\s*\|\s*(\S+)\s*\|\s*(\d+)\s*\|"
+    r"\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([\d.]+)\s*\|\s*([+-][\d.]+)\s*\|\s*$",
+    re.M,
+)
 FLOW = re.compile(
     r"^(red|guard|green|remove|spec|wiki)\(#(\d+)(?:-(\d+)\.(\d+))?\): \S"
 )
@@ -126,6 +134,24 @@ class Commit:
     subject: str
     body: str
     files: list[str]
+
+
+@dataclass
+class TokenomicsRow:
+    issue: int
+    change_id: str
+    date: str
+    rounds: int
+    tokens_in: int
+    tokens_out: int
+    cost: float
+    delta: float
+
+    def render(self) -> str:
+        return (
+            f"| #{self.issue} | {self.change_id} | {self.date} | {self.rounds} | "
+            f"{self.tokens_in} | {self.tokens_out} | {self.cost:.2f} | {self.delta:+.2f} |\n"
+        )
 
 
 # --- text --------------------------------------------------------------------------------
@@ -599,6 +625,52 @@ def review_state(cdir: Path) -> tuple[str | None, int]:
     verdict = VERDICT.search(text)
     rounds = sum(1 for row in ROUND_ROW.findall(text) if row == "CHANGES_REQUESTED")
     return (verdict[1] if verdict else None), rounds
+
+
+# --- tokenomics ----------------------------------------------------------------------------
+
+TOKENOMICS_HEADER = """\
+# Tokenomics
+
+Cumulative project-wide token and cost snapshots from `opencode stats --project . --all --cost
+--json`, recorded once per issue at its local-PR step (`sdd.py tokenomics`). This layer never
+counts tokens itself: `opencode stats` and `opencode session export` are the source of truth,
+and this file only keeps a history of their numbers to compare across time — a cheaper model, a
+caching change, a different round cap.
+
+`Δ cost` is this row's cumulative cost minus the previous row's: exact when issues are worked
+one at a time, a shared estimate when two overlap on parallel branches the same day.
+
+| Issue | Change | Date | Rounds | Tokens in | Tokens out | Cum. cost | Δ cost |
+|---|---|---|---|---|---|---|---|
+"""
+
+
+def read_tokenomics(path: Path) -> list[TokenomicsRow]:
+    if not path.is_file():
+        return []
+    rows = []
+    for match in TOKENOMICS_ROW.finditer(path.read_text()):
+        issue, change_id, date, rounds, tokens_in, tokens_out, cost, delta = (
+            match.groups()
+        )
+        rows.append(
+            TokenomicsRow(
+                int(issue),
+                change_id,
+                date,
+                int(rounds),
+                int(tokens_in),
+                int(tokens_out),
+                float(cost),
+                float(delta),
+            )
+        )
+    return rows
+
+
+def write_tokenomics(path: Path, rows: list[TokenomicsRow]) -> None:
+    path.write_text(TOKENOMICS_HEADER + "".join(row.render() for row in rows))
 
 
 # --- commits -----------------------------------------------------------------------------
@@ -1142,6 +1214,47 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 1 if problems else 0
 
 
+def cmd_tokenomics(args: argparse.Namespace) -> int:
+    root = args.root
+    on = on_branch(root)
+    if not on or on[0] != args.issue:
+        raise SddError(
+            f"not on branch {args.issue}-<change-id>: switch to it before recording tokenomics"
+        )
+    issue, change_id = on
+    _, rounds = review_state(root / "openspec" / "changes" / change_id)
+    exe = shutil.which("opencode")
+    if not exe:
+        raise SddError("opencode CLI not found: https://opencode.ai")
+    done = run([exe, "stats", "--project", ".", "--all", "--cost", "--json"], root)
+    if done.returncode:
+        raise SddError(f"opencode stats failed: {(done.stderr or done.stdout).strip()}")
+    try:
+        stats = json.loads(done.stdout)
+    except json.JSONDecodeError as err:
+        raise SddError(f"opencode stats did not return JSON: {err}") from err
+    path = root / "tokenomics.md"
+    rows = read_tokenomics(path)
+    cost = float(stats.get("cost", 0))
+    previous = rows[-1].cost if rows else 0.0
+    row = TokenomicsRow(
+        issue=issue,
+        change_id=change_id,
+        date=dt.date.today().isoformat(),
+        rounds=rounds,
+        tokens_in=int(stats.get("tokens", {}).get("input", 0)),
+        tokens_out=int(stats.get("tokens", {}).get("output", 0)),
+        cost=cost,
+        delta=cost - previous,
+    )
+    write_tokenomics(path, [*rows, row])
+    print(
+        f"tokenomics: #{issue} {change_id} — {rounds} round(s), "
+        f"{row.delta:+.2f} (cumulative {cost:.2f})"
+    )
+    return 0
+
+
 def cmd_stop_gate(args: argparse.Namespace) -> int:
     data: dict = {}
     if not sys.stdin.isatty():
@@ -1209,6 +1322,7 @@ COMMANDS = {
     "stale": cmd_stale,
     "status": cmd_status,
     "check": cmd_check,
+    "tokenomics": cmd_tokenomics,
     "stop-gate": cmd_stop_gate,
 }
 
@@ -1221,7 +1335,7 @@ def main(argv: list[str] | None = None) -> int:
     body = sub.add_parser("body")
     body.add_argument("--change")
     body.add_argument("--out", type=Path)
-    for name in ("branch", "pull", "diff"):
+    for name in ("branch", "pull", "diff", "tokenomics"):
         sub.add_parser(name).add_argument("issue", type=int)
     skip_specs = sub.add_parser("skip-specs")
     skip_specs.add_argument("change")

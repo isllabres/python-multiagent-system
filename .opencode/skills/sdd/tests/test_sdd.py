@@ -50,6 +50,16 @@ elif args[0] == "init":
 else:
     sys.exit(2)
 """
+OPENCODE = """\
+import json, os, sys
+args = sys.argv[1:]
+if args[0] == "stats":
+    print(os.environ.get("FAKE_OPENCODE_STATS") or json.dumps(
+        {"tokens": {"input": 0, "output": 0}, "cost": 0}
+    ))
+else:
+    sys.exit(2)
+"""
 TEST_CLIENT = "def test_server_error_is_retried(): ...\n\n\ndef test_retries_are_exhausted(): ...\n"
 
 
@@ -104,13 +114,14 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, code in (("gh", GH), ("openspec", OPENSPEC)):
+    for name, code in (("gh", GH), ("openspec", OPENSPEC), ("opencode", OPENCODE)):
         exe = bin_dir / name
         exe.write_text(f"#!{sys.executable}\n{code}")
         exe.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_GH_ISSUES", str(tmp_path / "issues.json"))
     monkeypatch.delenv("FAKE_VALIDATE", raising=False)
+    monkeypatch.delenv("FAKE_OPENCODE_STATS", raising=False)
     publish(root, 12, sdd.render_body(CHANGE, sdd.change_files(EXAMPLE)))
     return root
 
@@ -562,6 +573,58 @@ def test_status_brief_says_where_the_work_stands(repo: Path) -> None:
     out = cli(repo, "status", "--brief")[1]
     assert f"SDD: #12 {CHANGE} · tasks 0/3 · next 1.1 [test]" in out
     assert "SDD: resume with /implement-issue 12" in out
+
+
+# --- tokenomics ---------------------------------------------------------------------------
+
+
+def test_tokenomics_appends_a_row_with_rounds_and_cost(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mirror = implement(repo)
+    (mirror / "review.md").write_text(
+        "# Review\n\n**Verdict:** APPROVED\n\n## Rounds\n\n"
+        "| Round | Verdict | Blockers | Relevant |\n|---|---|---|---|\n"
+        "| 1 | CHANGES_REQUESTED | 1 | 0 |\n| 2 | APPROVED | 0 | 0 |\n"
+    )
+    monkeypatch.setenv(
+        "FAKE_OPENCODE_STATS",
+        json.dumps({"tokens": {"input": 1000, "output": 200}, "cost": 1.5}),
+    )
+    code, out, _ = cli(repo, "tokenomics", "12")
+    assert code == 0
+    assert "1 round(s)" in out and "+1.50" in out
+    rows = sdd.read_tokenomics(repo / "tokenomics.md")
+    assert len(rows) == 1
+    row = rows[0]
+    assert (row.issue, row.change_id, row.rounds) == (12, CHANGE, 1)
+    assert (row.tokens_in, row.tokens_out, row.cost, row.delta) == (1000, 200, 1.5, 1.5)
+
+
+def test_tokenomics_delta_is_cumulative_cost_minus_previous_row(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mirror = implement(repo)
+    (mirror / "review.md").write_text("# Review\n\n**Verdict:** APPROVED\n")
+    monkeypatch.setenv(
+        "FAKE_OPENCODE_STATS",
+        json.dumps({"tokens": {"input": 1000, "output": 200}, "cost": 10.0}),
+    )
+    assert cli(repo, "tokenomics", "12")[0] == 0
+    monkeypatch.setenv(
+        "FAKE_OPENCODE_STATS",
+        json.dumps({"tokens": {"input": 1800, "output": 500}, "cost": 16.5}),
+    )
+    assert cli(repo, "tokenomics", "12")[0] == 0
+    rows = sdd.read_tokenomics(repo / "tokenomics.md")
+    assert len(rows) == 2
+    assert rows[0].rounds == 0 and rows[0].delta == 10.0
+    assert rows[1].cost == 16.5 and rows[1].delta == 6.5
+
+
+def test_tokenomics_refuses_off_the_issue_branch(repo: Path) -> None:
+    code, _, err = cli(repo, "tokenomics", "12")
+    assert code == 1 and "switch to it" in err
 
 
 def test_the_stop_gate_lets_unfinished_or_blocked_work_stop(repo: Path) -> None:

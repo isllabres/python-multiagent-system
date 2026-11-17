@@ -85,6 +85,13 @@ opencode providers login openai
 providers list` shows what is already configured. OpenCode reloads config on restart, not
 mid-session: quit and start a new `opencode` session after editing an agent file.
 
+Where to look first: `reviewer`'s checkpoints split into mechanical ones (C1–C4, C6 — transcribed
+from `sdd.py check`, `pytest`, `ruff`, `mypy`, all deterministic) and judgment ones (C5, C7, C8 —
+whether a test proves its scenario, the Python against `python-standards`, a clean scope). Both
+halves run in the same subagent call, on the same model as `manager` by default, so there is no
+free lunch here — but if you want to test a cheaper model on `reviewer` without touching
+`manager`, that mixed workload is exactly where to start measuring (see *Tokenomics* below).
+
 ### Before you start
 
 - **Ruff lints the layer too.** Your `ruff check .` also covers the layer's scripts. Under a strict
@@ -260,6 +267,27 @@ condensed. A checker fails on anchors pointing at code that no longer exists:
 python3 .opencode/skills/project-wiki/scripts/check_wiki.py
 ```
 
+## Tokenomics
+
+This layer already keeps cost down by design — a bounded round cap, a change scoped to one
+diff, context handed over as paths rather than content — but it does not count tokens itself.
+OpenCode already does, at the harness level, for every session it runs:
+
+```bash
+opencode stats --project . --cost --models   # this project's token and cost totals
+opencode session export <session>            # one session's full token usage
+```
+
+Treat those as the source of truth for real spend; nothing here duplicates them. What this
+layer does add is `tokenomics.md`, a one-line-per-issue history that `manager` appends to at the
+local-PR step (`sdd.py tokenomics <n>`): the round count, and a project-wide cumulative
+token/cost snapshot from `opencode stats --all`, with the cost delta against the previous row.
+It exists so a change to the setup — a cheaper model on one agent, a different round cap,
+caching — can be compared against what issues cost before it, without re-deriving anything
+OpenCode already tracks. Because `opencode stats` only filters by day count, year or lifetime
+(no arbitrary date range), the delta is exact when issues are worked one at a time and a shared
+estimate when two overlap on parallel branches the same day.
+
 ## Commits
 
 One commit per task, subjects of 72 characters at most, imperative, naming the behaviour. An
@@ -291,7 +319,7 @@ its own prompt points at it by name.
 
 | Skill | What it does |
 |---|---|
-| `sdd` | The issue and its change, the format and task rules, states, checkpoints, and `sdd.py` (used by `manager`, `implementer` and `reviewer`) |
+| `sdd` | The issue and its change, the format and task rules, states, checkpoints, tokenomics, and `sdd.py` (used by `manager`, `implementer` and `reviewer`) |
 | `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling |
 | `project-wiki` | How every agent reads the wiki as a code map, the entry format, and the checker |
 
@@ -313,6 +341,7 @@ And in your project, once it is used:
 openspec/specs/           What the system does now: the living specs.
 openspec/changes/<id>/    A change being implemented, on its branch (archived by its PR).
 wiki/                     A native GitHub Wiki: the code map and the changelog.
+tokenomics.md             A cumulative token/cost snapshot per issue, from opencode stats.
 ```
 
 `src/`, `tests/` and the rest are your project, not this layer.

@@ -141,6 +141,7 @@ the exit status is 1 if there is any.
 | `stale N` / `stale --all` | Why an open issue's change may no longer apply: validation, files the design modifies, living specs changed since the issue, a closed issue |
 | `status [--brief]` | Where the work stands, from disk and git only (the SessionStart hook) |
 | `check [--change ID] [--base B] [--remote]` | Format and traceability; `--base` adds ticks, commit discipline, tests that exist and the wiki line; `--remote` adds drift from the issue |
+| `tokenomics N` | Append issue N's round count and a cumulative token/cost snapshot (from `opencode stats`) to `tokenomics.md` |
 | `stop-gate` | The Stop hook: exit 2 when work marked as done fails its checks |
 
 Tests: `uv run pytest .opencode/skills/sdd/tests -q` (one test needs the OpenSpec CLI on the PATH).
