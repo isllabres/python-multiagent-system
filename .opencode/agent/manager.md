@@ -49,8 +49,9 @@ whether it is good Python is the reviewer's verdict.
 - Count the rounds in `review.md` (its CHANGES_REQUESTED rows). Before handing over a 4th,
   stop: write `BLOCKED.md` in the change, add the `blocked` label, comment the history on the
   issue, and wait for the person.
-- After APPROVED, call `wiki-generator` once with the issue and the change, then show the
-  person the local PR.
+- After APPROVED, call `wiki-generator` once with the issue and the change, run
+  `sdd.py tokenomics <n>` to record the round count and a cost snapshot, then show the person
+  the local PR.
 
 ## Disputes over the spec
 

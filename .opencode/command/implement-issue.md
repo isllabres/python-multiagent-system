@@ -82,10 +82,13 @@ writes `review.md` and replies:
 
    Anything they report goes back to its owner: the wiki to `wiki-generator`, the rest to
    `implementer` through a review round.
-3. Commit `review.md` as `spec(#$ARGUMENTS): review <id>`.
-4. **Show me the local PR and stop**: the diff against the default branch, the commits, the
-   verdict and checkpoints of `review.md` with any disagreement, the wiki pages touched, and the
-   PR body:
+3. `sdd.py tokenomics $ARGUMENTS` appends this issue's round count and a cumulative token/cost
+   snapshot — sourced from `opencode stats`, never counted by this layer itself — to
+   `tokenomics.md`, for comparing cost across issues over time.
+4. Commit `review.md` and `tokenomics.md` as `spec(#$ARGUMENTS): review <id>`.
+5. **Show me the local PR and stop**: the diff against the default branch, the commits, the
+   verdict and checkpoints of `review.md` with any disagreement, the wiki pages touched, the
+   tokenomics line, and the PR body:
 
    ```markdown
    ## Summary
@@ -95,6 +98,8 @@ writes `review.md` and replies:
    - Verdict, checkpoints, rounds, disagreements (both positions)
    ## Wiki
    - <pages touched, or none>
+   ## Tokenomics
+   - <rounds> round(s), Δ cost <value> (cumulative <value>) — see `tokenomics.md`
    Closes #$ARGUMENTS
    ```
 

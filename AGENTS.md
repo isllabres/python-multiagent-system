@@ -14,8 +14,8 @@ A change can pass every test and still be the wrong change, or be written so bad
 
 This system does not create `src/`, `tests/` or any other directory of your project; it adapts
 to the project at hand. What it creates is its own output: `openspec/` when the project does not
-have it yet (the living specs and the changes, managed by the OpenSpec CLI) and `wiki/` (what
-gets learned).
+have it yet (the living specs and the changes, managed by the OpenSpec CLI), `wiki/` (what gets
+learned) and `tokenomics.md` (what it has cost).
 
 ## The map — read what you need, when you need it
 
@@ -30,6 +30,7 @@ gets learned).
 | `openspec/specs/` | What the system does now: the living specs | Before changing behaviour |
 | `openspec/changes/<id>/` | The change on its branch, mirrored from its issue | While implementing it |
 | `wiki/` | The code map and the log of changes | Before reading code |
+| `tokenomics.md` | A cumulative token/cost snapshot per issue, from `opencode stats` | Before weighing a model or round-cap change |
 
 ## Spec-driven, on OpenSpec, with the issue as the source of truth
 
