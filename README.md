@@ -288,6 +288,12 @@ OpenCode already tracks. Because `opencode stats` only filters by day count, yea
 (no arbitrary date range), the delta is exact when issues are worked one at a time and a shared
 estimate when two overlap on parallel branches the same day.
 
+Once there is a little history, `sdd.py tokenomics` also warns, in the local PR's Tokenomics
+section, when an issue's cost is far above recent issues (3× the median of the last 3 or more,
+by default) — a budget guardrail sized from real runs rather than guessed up front. It never
+blocks: the round cap already bounds cost while the change is in flight, so this flag is
+information for the person reviewing the local PR, not another gate.
+
 ## Commits
 
 One commit per task, subjects of 72 characters at most, imperative, naming the behaviour. An

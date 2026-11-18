@@ -627,6 +627,69 @@ def test_tokenomics_refuses_off_the_issue_branch(repo: Path) -> None:
     assert code == 1 and "switch to it" in err
 
 
+# --- the budget flag -----------------------------------------------------------------------
+
+
+def test_budget_flag_says_nothing_before_three_prior_issues() -> None:
+    previous = [
+        sdd.TokenomicsRow(1, CHANGE, "2026-01-01", 0, 0, 0, 1.0, 1.0),
+        sdd.TokenomicsRow(2, CHANGE, "2026-01-02", 0, 0, 0, 2.0, 1.0),
+    ]
+    assert sdd.budget_flag(previous, 100.0) is None
+
+
+def test_budget_flag_says_nothing_within_the_multiplier() -> None:
+    previous = [
+        sdd.TokenomicsRow(1, CHANGE, "2026-01-01", 0, 0, 0, 1.0, 1.0),
+        sdd.TokenomicsRow(2, CHANGE, "2026-01-02", 0, 0, 0, 2.0, 1.0),
+        sdd.TokenomicsRow(3, CHANGE, "2026-01-03", 0, 0, 0, 3.0, 1.0),
+    ]
+    assert sdd.budget_flag(previous, 3.0) is None  # exactly 3x the median of 1.0
+
+
+def test_budget_flag_warns_once_past_the_multiplier() -> None:
+    previous = [
+        sdd.TokenomicsRow(1, CHANGE, "2026-01-01", 0, 0, 0, 1.0, 1.0),
+        sdd.TokenomicsRow(2, CHANGE, "2026-01-02", 0, 0, 0, 2.0, 1.0),
+        sdd.TokenomicsRow(3, CHANGE, "2026-01-03", 0, 0, 0, 3.0, 1.0),
+    ]
+    flag = sdd.budget_flag(previous, 10.0)
+    assert flag is not None
+    assert "10.0x the median of the last 3 issues (1.00)" in flag
+
+
+def test_budget_flag_drops_non_positive_deltas_from_the_sample() -> None:
+    previous = [
+        sdd.TokenomicsRow(1, CHANGE, "2026-01-01", 0, 0, 0, 1.0, 1.0),
+        sdd.TokenomicsRow(2, CHANGE, "2026-01-02", 0, 0, 0, 1.0, -1.0),
+        sdd.TokenomicsRow(3, CHANGE, "2026-01-03", 0, 0, 0, 1.0, 0.0),
+    ]
+    assert sdd.budget_flag(previous, 100.0) is None  # only one real sample
+
+
+def test_tokenomics_prints_the_budget_flag_once_history_supports_it(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mirror = implement(repo)
+    (mirror / "review.md").write_text("# Review\n\n**Verdict:** APPROVED\n")
+    cumulative = 0.0
+    for _ in range(3):  # three prior issues, delta 1.0 each
+        cumulative += 1.0
+        monkeypatch.setenv(
+            "FAKE_OPENCODE_STATS",
+            json.dumps({"tokens": {"input": 10, "output": 10}, "cost": cumulative}),
+        )
+        assert cli(repo, "tokenomics", "12")[0] == 0
+    cumulative += 10.0  # ten times the median delta of 1.0
+    monkeypatch.setenv(
+        "FAKE_OPENCODE_STATS",
+        json.dumps({"tokens": {"input": 10, "output": 10}, "cost": cumulative}),
+    )
+    code, out, _ = cli(repo, "tokenomics", "12")
+    assert code == 0
+    assert "10.0x the median of the last 3 issues" in out
+
+
 def test_the_stop_gate_lets_unfinished_or_blocked_work_stop(repo: Path) -> None:
     assert cli(repo, "stop-gate", stdin="{}")[0] == 0
     git(repo, "switch", "-q", "-c", f"12-{CHANGE}")
