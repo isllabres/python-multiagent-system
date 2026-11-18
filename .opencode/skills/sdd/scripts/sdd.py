@@ -19,7 +19,8 @@ written from it, and only tasks.md gains local progress there (ticks, notes, loc
                           format and traceability; with --base, ticks, commit discipline and
                           tests; with --remote, drift from the issue
   tokenomics N            append this issue's round count and a cumulative token/cost snapshot
-                          (from `opencode stats`) to tokenomics.md, for comparison over time
+                          (from `opencode stats`) to tokenomics.md, flagging a cost far above
+                          recent history
   stop-gate               the Stop hook: exit 2 when work that claims to be done fails a check
 
 Every problem is one line; the exit status is 1 if there is any.
@@ -36,6 +37,7 @@ import json
 import os
 import re
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -56,6 +58,8 @@ SKIP_SPECS_LINE = "skip_specs: true"
 LOCAL_SECTIONS = ("## Replies to review", "## Wiki gaps")
 MAX_ROUNDS = 3
 MAX_BODY = 65536
+BUDGET_MULTIPLIER = 3
+BUDGET_MIN_SAMPLE = 3
 REFUSED = "Archive would refuse"
 CONFIG_FILES = ("pyproject.toml", "setup.cfg", "pytest.ini", "tox.ini", "uv.lock")
 KIND_OF = {"red": "test", "guard": "guard", "green": "code", "remove": "remove"}
@@ -673,6 +677,24 @@ def write_tokenomics(path: Path, rows: list[TokenomicsRow]) -> None:
     path.write_text(TOKENOMICS_HEADER + "".join(row.render() for row in rows))
 
 
+def budget_flag(previous: list[TokenomicsRow], delta: float) -> str | None:
+    """A one-line warning when `delta` is far above recent history, or None.
+
+    Needs at least BUDGET_MIN_SAMPLE prior issues before it says anything, so a cold start
+    never flags; a run with a wrong or missing cost (delta <= 0) is dropped from the sample.
+    """
+    sample = [row.delta for row in previous if row.delta > 0]
+    if len(sample) < BUDGET_MIN_SAMPLE:
+        return None
+    middle = statistics.median(sample)
+    if middle <= 0 or delta <= middle * BUDGET_MULTIPLIER:
+        return None
+    return (
+        f"tokenomics: this issue cost {delta / middle:.1f}x the median of the last "
+        f"{len(sample)} issues ({middle:.2f}) — worth a look"
+    )
+
+
 # --- commits -----------------------------------------------------------------------------
 
 
@@ -1252,6 +1274,9 @@ def cmd_tokenomics(args: argparse.Namespace) -> int:
         f"tokenomics: #{issue} {change_id} — {rounds} round(s), "
         f"{row.delta:+.2f} (cumulative {cost:.2f})"
     )
+    flag = budget_flag(rows, row.delta)
+    if flag:
+        print(flag)
     return 0
 
 

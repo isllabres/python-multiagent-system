@@ -81,13 +81,17 @@ then you see them again. Nothing is created until you approve explicitly.
 ```bash
 tmpfile=$(mktemp /tmp/issue-XXXXXX)
 python3 .opencode/skills/sdd/scripts/sdd.py body --change <id> --out "$tmpfile"
-gh issue create --title "[<area>]: <imperative description>" --body-file "$tmpfile" --label "..."
+url=$(gh issue create --title "[<area>]: <imperative description>" --body-file "$tmpfile" --label "...")
 rm "$tmpfile"
 ```
 
 Add `pending` if it is filed for later; a child of an epic names its parent in the title or a
-label. Then delete the draft, `openspec/changes/<id>/`: the issue holds the change now.
-Nothing is committed and no branch is created — that is `/implement-issue`.
+label. **Confirm before deleting anything**: `gh issue create` prints the new issue's URL on
+success and exits non-zero on failure. Only once `$url` is a real `.../issues/<n>` link, delete
+the draft, `openspec/changes/<id>/`: the issue holds the change now. If `gh` failed or printed
+nothing you recognise, **stop** and show the raw output instead — the draft stays, and nothing
+is deleted on a guess. Nothing is committed and no branch is created — that is
+`/implement-issue`.
 
 ## Principles
 

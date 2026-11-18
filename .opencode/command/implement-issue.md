@@ -100,22 +100,26 @@ writes `review.md` and replies:
    - <pages touched, or none>
    ## Tokenomics
    - <rounds> round(s), Δ cost <value> (cumulative <value>) — see `tokenomics.md`
+   - <the budget flag, if `sdd.py tokenomics` printed one>
    Closes #$ARGUMENTS
    ```
 
 ## Step 7 — Only with my explicit confirmation
 
-- **Accepted**:
+- **Accepted**, one step confirmed before the next:
 
   ```bash
   openspec archive <id> --yes        # the living specs take the change; the change is archived
   git add openspec && git commit -m "spec(#$ARGUMENTS): archive <id>"
-  git push -u origin "$branch"
-  gh pr create --title "<issue title>" --body-file "$tmpfile"
+  git push -u origin "$branch"       # confirm this succeeded before the next line
+  url=$(gh pr create --title "<issue title>" --body-file "$tmpfile")
   ```
 
   Archiving inside the PR means the merge updates the code and `openspec/specs/` together, and
-  a PR closed without merging never touches the default branch. Report the PR's URL.
+  a PR closed without merging never touches the default branch. `git push` must report the
+  branch updated on the remote before `gh pr create` runs: if it fails (diverged, auth,
+  network), **stop** and show the error — never retry blindly, and never open a PR from a
+  branch that did not actually push. Report `$url`, the PR it names.
 - **Changes requested**: they become tasks in the issue (your request is the approval), the
   mirror is pulled again, and the work goes back to Step 4.
 

@@ -46,6 +46,11 @@ whether it is good Python is the reviewer's verdict.
 - Hand over paths, never content: "implement `openspec/changes/<id>/` from its first unticked
   task", "review `<id>` against `<default-branch>`", "answer round <k> of `review.md`".
 - Read the one-line replies; open a file only to decide, and only the part you need.
+- **Confirm a reply before acting on it.** A one-line reply names a path or a commit — it is
+  that subagent's report, not proof. Before treating `done`, `wiki -> <sha>` or a verdict as
+  true, check the thing it names actually exists: `git cat-file -e <sha>` for a commit, the
+  file itself for a path. `sdd.py check` already re-verifies `implementer`'s claims this way
+  (ticks, tests, commit discipline); nothing else did for `wiki-generator`'s reported sha.
 - Count the rounds in `review.md` (its CHANGES_REQUESTED rows). Before handing over a 4th,
   stop: write `BLOCKED.md` in the change, add the `blocked` label, comment the history on the
   issue, and wait for the person.
