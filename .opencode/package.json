@@ -1,0 +1,12 @@
+{
+  "name": "@python-multiagent-system/opencode",
+  "private": true,
+  "type": "module",
+  "description": "The Stop-gate plugin's V2 SDK and its test runtime; never published.",
+  "dependencies": {
+    "@opencode/plugin": "2.0.29"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}
