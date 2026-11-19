@@ -35,6 +35,7 @@ git -C ~/code/python-multiagent-system archive origin/main .opencode AGENTS.md |
 cd ~/code/my-project
 uv add --dev pytest ruff mypy
 npm install -g @fission-ai/openspec@latest        # or: brew install openspec
+npm install --prefix .opencode                    # the Stop-gate plugin's own SDK
 gh auth status
 
 # 4. Set up OpenSpec (openspec init --tools none) and add this layer's rules to its config
@@ -338,7 +339,7 @@ AGENTS.md                 The contract: the map and the hard rules.
   agent/*.md              The five agents.
   command/*.md            The four commands, with the scripts, tests and example that go with them.
   skills/*/SKILL.md       The three reference skills.
-  plugin/stop-gate.ts     The Stop-gate plugin.
+  plugin/stop-gate.ts     The Stop-gate plugin, with its own regression tests in plugin/tests/.
 ```
 
 And in your project, once it is used:
