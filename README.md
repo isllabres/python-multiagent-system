@@ -125,7 +125,43 @@ free lunch here — but if you want to test a cheaper model on `reviewer` withou
 - **The wiki starts empty.** `wiki-generator` creates `wiki/` on its first call, and `check_wiki.py`
   reports missing pages until then.
 - **Your layout is respected.** The layer never creates `src/` or `tests/`; it creates only its own
-  output: `openspec/` (when the project does not have it) and `wiki/`.
+  output: `openspec/` (when the project does not have it), `wiki/` and `tokenomics.md`.
+
+### Upgrading the layer
+
+`.opencode/` and `AGENTS.md` are the layer; `openspec/`, `wiki/` and `tokenomics.md` are your
+project's own output, and an upgrade never touches them. To pick up a newer version:
+
+```bash
+# 1. Get the latest layer
+git -C ~/code/python-multiagent-system pull
+
+# 2. Re-export it over your project's copy (tracked files only, same as install step 2)
+cd ~/code/my-project
+git switch -c upgrade-multiagent-layer
+git -C ~/code/python-multiagent-system archive origin/main .opencode AGENTS.md | tar -x -C .
+
+# 3. See exactly what changed
+git status
+git diff -- .opencode AGENTS.md
+```
+
+The export overwrites `.opencode/` and `AGENTS.md` wholesale, so `git diff` is how you catch
+what it clobbers:
+
+- **Per-agent models** (`.opencode/agent/*.md`): if you moved one off its default per *Mixing
+  providers*, reapply just that `model:` line.
+- **`.opencode/opencode.json`**: if you merged its `permission` block into your own at install,
+  fold that block back in by hand — the same note as in *Before you start*.
+- **A custom `AGENTS.md`**: if you installed with the `@AGENTS.multiagent.md` pattern, re-export
+  `AGENTS.md` to that file instead of letting it overwrite your own:
+
+  ```bash
+  git -C ~/code/python-multiagent-system archive origin/main AGENTS.md | tar -xO > AGENTS.multiagent.md
+  ```
+
+Then run the usual checks (`uv run pytest -q`, `ruff check .`, …) and open a PR on your
+project's own remote, like any other change: a layer upgrade is not exempt from review.
 
 ### Upgrading from the Claude Code version
 
