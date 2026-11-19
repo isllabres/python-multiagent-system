@@ -473,6 +473,35 @@ def test_a_commit_that_breaks_the_discipline_is_reported(
     assert code == 1 and expected in out, out
 
 
+def test_a_spec_commit_may_also_touch_tokenomics_md(repo: Path) -> None:
+    implement(repo)
+    commit(
+        repo,
+        "wiki(#12): log the retry change",
+        {"wiki/log.md": f"- #12 · {CHANGE}\n"},
+    )
+    commit(
+        repo,
+        "spec(#12): review add-retry-backoff",
+        {
+            f"openspec/changes/{CHANGE}/review.md": "# Review\n\n**Verdict:** APPROVED\n",
+            "tokenomics.md": "# Tokenomics\n",
+        },
+    )
+    assert cli(repo, "check", "--base", "main")[:2] == (0, "check ok\n")
+
+
+def test_a_wiki_commit_may_not_touch_tokenomics_md(repo: Path) -> None:
+    implement(repo)
+    commit(
+        repo,
+        "wiki(#12): log the retry change",
+        {"wiki/log.md": "- #12 retry\n", "tokenomics.md": "# Tokenomics\n"},
+    )
+    code, out, _ = cli(repo, "check", "--base", "main")
+    assert code == 1 and "touches tokenomics.md, outside wiki/" in out
+
+
 def test_a_test_fixed_in_a_review_round_passes(repo: Path) -> None:
     implement(repo)
     commit(

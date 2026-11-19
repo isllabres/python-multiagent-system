@@ -755,7 +755,12 @@ def discipline(
             problems.append(f"{label}: names #{number}, this branch is #{issue}")
         if prefix in ("spec", "wiki"):
             home = "openspec/" if prefix == "spec" else "wiki/"
-            outside = [path for path in commit.files if not path.startswith(home)]
+            outside = [
+                path
+                for path in commit.files
+                if not path.startswith(home)
+                and not (prefix == "spec" and path == "tokenomics.md")
+            ]
             if flow[3]:
                 problems.append(
                     f"{label}: a {prefix} commit names the issue, not a task"
