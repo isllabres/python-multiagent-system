@@ -28,8 +28,10 @@ Requirements: [OpenCode](https://opencode.ai), `git`, `gh` (authenticated: no `g
 # 1. Get the layer, once
 git clone https://github.com/isllabres/python-multiagent-system.git ~/code/python-multiagent-system
 
-# 2. Export a clean snapshot of its main branch into your project (tracked files only)
-git -C ~/code/python-multiagent-system archive origin/main .opencode AGENTS.md | tar -x -C ~/code/my-project
+# 2. Export its latest release (tracked files only) into your project
+git -C ~/code/python-multiagent-system fetch --quiet --tags
+latest=$(git -C ~/code/python-multiagent-system tag --merged origin/HEAD --sort=-version:refname | head -1)
+git -C ~/code/python-multiagent-system archive "$latest" .opencode AGENTS.md | tar -x -C ~/code/my-project
 
 # 3. Tooling, in your project
 cd ~/code/my-project
@@ -40,24 +42,31 @@ gh auth status
 # 4. Set up OpenSpec (openspec init --tools none) and add this layer's rules to its config
 python3 .opencode/skills/sdd/scripts/sdd.py init
 
-# 5. Sign in to every provider you want an agent to use
+# 5. Start tracking this release, so you can pull in the next one and propose fixes back
+python3 .opencode/skills/distribution/scripts/layer_sync.py init \
+    https://github.com/isllabres/python-multiagent-system.git --version "$latest"
+
+# 6. Sign in to every provider you want an agent to use
 opencode providers login          # e.g. Anthropic, or set ANTHROPIC_API_KEY
 opencode providers login openai   # only if you will point an agent at openai/...
 
-# 6. Commit the layer to your project's own repository, on its own branch
+# 7. Commit the layer to your project's own repository, on its own branch
 git switch -c add-multiagent-layer
 git add .opencode AGENTS.md openspec
 git commit -m "Add the python-multiagent-system layer"
 git push -u origin add-multiagent-layer
 
-# 7. Start working
+# 8. Start working
 opencode
 ```
 
 `git archive` is used instead of `cp -r` because it copies only tracked files, so no `.DS_Store`
 or local cache comes along. Plain `opencode` already starts you as `manager` — the layer's
 `.opencode/opencode.json` sets `default_agent: "manager"` — so there is no flag to remember; the
-explicit form `opencode --agent manager` works too.
+explicit form `opencode --agent manager` works too. The `layer.json` file step 5 writes inside
+`.opencode/` is how *Keeping it up to date* and *Sending a fix upstream* below know where the
+layer came from and which release you are on; it is yours to commit along with the rest of
+`.opencode`.
 
 ### Which remote
 
@@ -133,6 +142,34 @@ If your project still has `.claude/` and `CLAUDE.md` from an earlier install, re
 are not read by OpenCode. Old `specs/<n>-<slug>/ACCEPTANCE.yaml` folders, from even earlier, are
 ignored too. An open issue from before this flow has no OpenSpec change in its body:
 `/update-issue <n> -- convert to OpenSpec` writes one with your approval.
+
+### Keeping it up to date
+
+```bash
+python3 .opencode/skills/distribution/scripts/layer_sync.py status    # what's new, from the changelog
+python3 .opencode/skills/distribution/scripts/layer_sync.py upgrade   # pull in the latest release
+```
+
+`upgrade` compares every file under `.opencode/` and `AGENTS.md` against the release recorded in
+`layer.json`: a file you never touched is replaced outright, one you edited is merged
+with `git merge-file` against the upstream change, and a real conflict — both sides touched the
+same lines — is left with `<<<<<<<` markers for you to resolve, exactly like a `git merge`.
+Nothing is committed; review `git diff` and commit it yourself. Pass `--to vX.Y.Z` to stop short
+of the latest release. Details in `.opencode/skills/distribution/SKILL.md`.
+
+### Sending a fix upstream
+
+Found a better prompt for an agent, a bug in `sdd.py`, or a check that should exist? If it is in
+a file this layer installed, propose it back instead of keeping it local:
+
+```bash
+python3 .opencode/skills/distribution/scripts/layer_sync.py propose-upstream .opencode/agent/manager.md
+```
+
+It diffs that file against the release you installed, shows you the diff, and — once you confirm
+— opens an issue on `isllabres/python-multiagent-system` with the diff in its body, for review.
+It never pushes a branch or opens a PR on its own; `gh` must be logged in to wherever the layer's
+own repository lives.
 
 ### Use it
 
@@ -328,6 +365,7 @@ its own prompt points at it by name.
 | `sdd` | The issue and its change, the format and task rules, states, checkpoints, tokenomics, and `sdd.py` (used by `manager`, `implementer` and `reviewer`) |
 | `python-standards` | One rubric for good Python: structure, typing, language traps, errors, idioms, performance, security, tooling |
 | `project-wiki` | How every agent reads the wiki as a code map, the entry format, and the checker |
+| `distribution` | How an installed project tracks, upgrades from, and proposes fixes back to this layer |
 
 ## What you will find in the repository
 
@@ -337,13 +375,14 @@ AGENTS.md                 The contract: the map and the hard rules.
   opencode.json           default_agent and the bash permission allowlist.
   agent/*.md              The five agents.
   command/*.md            The four commands, with the scripts, tests and example that go with them.
-  skills/*/SKILL.md       The three reference skills.
+  skills/*/SKILL.md       The four reference skills.
   plugin/stop-gate.ts     The Stop-gate plugin.
 ```
 
 And in your project, once it is used:
 
 ```
+.opencode/layer.json      The upstream repository and release this copy of the layer tracks.
 openspec/specs/           What the system does now: the living specs.
 openspec/changes/<id>/    A change being implemented, on its branch (archived by its PR).
 wiki/                     A native GitHub Wiki: the code map and the changelog.
