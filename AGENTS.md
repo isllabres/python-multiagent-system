@@ -27,6 +27,7 @@ learned) and `tokenomics.md` (what it has cost).
 | `.opencode/command/*.md` | The workflows (`/create-issue`, `/implement-issue`, `/update-issue`, `/grill-me`) | When you run one |
 | `.opencode/skills/python-standards/` | The Python rubric | Before writing or reviewing code |
 | `.opencode/skills/project-wiki/` | How to read the wiki, its format and checker | Before reading code |
+| `.opencode/skills/distribution/` | How an installed project tracks, upgrades and sends fixes back to this layer, `layer_sync.py` | Before changing a release's shape, or anything `layer_sync.py` reads |
 | `openspec/specs/` | What the system does now: the living specs | Before changing behaviour |
 | `openspec/changes/<id>/` | The change on its branch, mirrored from its issue | While implementing it |
 | `wiki/` | The code map and the log of changes | Before reading code |
